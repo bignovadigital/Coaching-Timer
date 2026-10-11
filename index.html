@@ -971,7 +971,10 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   const embedded = (() => { try { return window.self !== window.top; } catch { return true; } })();
   // Adresse de retour normalisée : …/Coaching-Timer/ (sans « index.html »), identique à celle à déclarer chez Spotify
   const REDIRECT = location.origin + location.pathname.replace(/index\.html$/, "");
+  // Client ID de l'app Spotify « Coaching Timer » (identifiant public, pas un secret)
+  const DEFAULT_CLIENT_ID = "75cbbd0ff6df4903a93f024b4ebb1be7";
   const sp = Object.assign({ clientId: "", access: "", refresh: "", expires: 0 }, store.get(K.sp, {}));
+  if (!sp.clientId) sp.clientId = DEFAULT_CLIENT_ID;
   const saveSp = () => store.set(K.sp, sp);
   let spState = null; // dernier état du lecteur
 
