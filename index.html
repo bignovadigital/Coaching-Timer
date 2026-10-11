@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Coaching Timer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;800&family=Barlow:wght@400;500;600&family=Chivo+Mono:wght@600;800&display=swap">
+<style>
+/* Layout: éditeur en colonne (blocs empilés) → écran de séance plein écran façon horloge de box */
+:root {
+  color-scheme: dark;
+  --bg: #0e1012;
+  --panel: #171a1d;
+  --line: #2a2f34;
+  --fg: #eef1f2;
+  --muted: #8d969c;
+  --accent: #f5c518;        /* jaune chrono / préparation */
+  --work: #2fd16b;          /* travail */
+  --rest: #ff4d4d;          /* repos */
+  --blockrest: #4da3ff;     /* repos entre blocs */
+  --on-accent: #111;
+  --font-display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-digits: "Chivo Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.45 var(--font-body);
+  -webkit-tap-highlight-color: transparent;
+}
+[hidden] { display: none !important; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- Éditeur ---------- */
+.editor {
+  max-width: 760px;
+  margin: 0 auto;
+  padding-inline: 16px;
+  padding-block: 20px 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.brand { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brand h1 {
+  margin: 0;
+  font: 800 2rem/1 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: .02em;
+}
+.brand h1 span { color: var(--accent); }
+.brand p { margin: 0; color: var(--muted); font-size: .9rem; }
+
+.label {
+  font: 700 .78rem/1 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: var(--muted);
+}
+.templates { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  border: 1px solid var(--line);
+  background: transparent;
+  border-radius: 999px;
+  padding: 7px 14px;
+  font: 600 .95rem/1 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+
+.field-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field.grow { flex: 1 1 220px; }
+input[type="text"], input[type="number"], select {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  min-width: 0;
+}
+input[type="number"] { width: 4.2em; text-align: center; font-family: var(--font-digits); font-variant-numeric: tabular-nums; }
+.time { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-digits); }
+
+.blocks { display: flex; flex-direction: column; gap: 12px; }
+.block {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.block-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.block-letter {
+  width: 40px; height: 40px; flex: none;
+  display: grid; place-items: center;
+  background: var(--accent); color: var(--on-accent);
+  border-radius: 8px;
+  font: 800 1.4rem/1 var(--font-display);
+}
+.block-head input[type="text"] { flex: 1 1 140px; }
+.block-tools { display: flex; gap: 6px; margin-left: auto; }
+.icon-btn {
+  border: 1px solid var(--line); background: transparent;
+  border-radius: 8px; padding: 6px 10px; font-size: .85rem; color: var(--muted);
+}
+.icon-btn:hover { color: var(--fg); border-color: var(--muted); }
+.block-sum { color: var(--muted); font-size: .88rem; font-family: var(--font-digits); }
+
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn {
+  border: 1px solid var(--line); background: var(--panel);
+  border-radius: 10px; padding: 11px 16px;
+  font: 700 1rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .06em;
+}
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+
+.saved { display: flex; flex-direction: column; gap: 6px; }
+.saved-item {
+  display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid var(--line); padding-block: 8px;
+}
+.saved-item button.load { flex: 1; text-align: left; background: none; border: none; padding: 0; min-width: 0; }
+.saved-item small { color: var(--muted); font-family: var(--font-digits); }
+.empty { color: var(--muted); font-size: .9rem; margin: 0; }
+
+.startbar {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(transparent, var(--bg) 35%);
+  padding: 28px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  display: flex; justify-content: center;
+}
+.startbar .inner { width: 100%; max-width: 760px; display: flex; align-items: center; gap: 14px; }
+.total { flex: 1; min-width: 0; }
+.total b { display: block; font: 800 1.6rem/1 var(--font-digits); }
+.go {
+  background: var(--work); color: var(--on-accent); border: none;
+  border-radius: 12px; padding: 16px 28px;
+  font: 800 1.35rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em;
+}
+.toast {
+  position: fixed; top: calc(14px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
+  background: var(--fg); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-weight: 600; z-index: 9;
+}
+
+/* ---------- Écran de séance ---------- */
+.run {
+  position: fixed; inset: 0;
+  --phase: var(--accent);
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  gap: 10px;
+  overflow: hidden;
+}
+.run::before {
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 50% 45%, var(--phase), transparent 70%);
+  opacity: .16; pointer-events: none; transition: background .3s;
+}
+.run[data-phase="work"] { --phase: var(--work); }
+.run[data-phase="rest"] { --phase: var(--rest); }
+.run[data-phase="blockrest"] { --phase: var(--blockrest); }
+.run[data-phase="done"] { --phase: var(--accent); }
+.run > * { position: relative; }
+
+.run-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.run-block { font: 800 clamp(1.3rem, 4vw, 2.2rem)/1 var(--font-display); text-transform: uppercase; letter-spacing: .04em; min-width: 0; }
+.run-block small { display: block; color: var(--muted); font-size: .55em; letter-spacing: .14em; margin-top: 4px; }
+.run-total { text-align: right; font-family: var(--font-digits); color: var(--muted); font-size: .85rem; }
+.run-total b { display: block; color: var(--fg); font-size: 1.3rem; }
+
+.run-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 0; }
+.phase-pill {
+  background: var(--phase); color: var(--on-accent);
+  font: 800 clamp(1.1rem, 3.6vw, 1.8rem)/1 var(--font-display);
+  text-transform: uppercase; letter-spacing: .14em;
+  padding: 8px 18px; border-radius: 999px;
+}
+.clock {
+  font: 800 clamp(5rem, 24vw, 22rem)/1 var(--font-digits);
+  font-variant-numeric: tabular-nums;
+  color: var(--phase);
+  letter-spacing: -.03em;
+  text-shadow: 0 0 40px color-mix(in srgb, var(--phase) 35%, transparent);
+}
+.round { font: 700 clamp(1.4rem, 5vw, 3rem)/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; }
+.round span { color: var(--muted); }
+.counter { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+.counter b { font: 800 2rem/1 var(--font-digits); min-width: 2ch; text-align: center; }
+
+.progress { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; }
+.progress div { height: 100%; width: 0; background: var(--phase); }
+.next { text-align: center; color: var(--muted); font: 600 1.05rem/1.2 var(--font-display); text-transform: uppercase; letter-spacing: .08em; }
+.next b { color: var(--fg); }
+
+.controls { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.ctrl {
+  border: 1px solid var(--line); background: var(--panel);
+  border-radius: 12px; padding: 14px 18px; min-width: 64px;
+  font: 700 1rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .06em;
+}
+.ctrl.big { background: var(--fg); color: var(--bg); border-color: var(--fg); min-width: 140px; font-size: 1.2rem; }
+.ctrl.done { background: var(--work); color: var(--on-accent); border-color: var(--work); }
+
+@media (prefers-reduced-motion: reduce) { .run::before { transition: none; } }
+@media (max-height: 520px) and (orientation: landscape) {
+  .clock { font-size: clamp(4rem, 30vh, 14rem); }
+  .run { gap: 4px; }
+}
+</style>
+</head>
+<body>
+
+<main class="editor" id="editor">
+  <header class="brand">
+    <h1>Coaching <span>Timer</span></h1>
+    <p>Blocs, tours, repos. Décompte automatique.</p>
+  </header>
+
+  <section class="field-row" aria-label="Modèles rapides">
+    <div class="field" style="flex:1 1 100%">
+      <span class="label">Modèles rapides</span>
+      <div class="templates" id="templates"></div>
+    </div>
+  </section>
+
+  <section class="field-row" aria-label="Réglages de la séance">
+    <label class="field grow">
+      <span class="label">Nom de la séance</span>
+      <input type="text" id="w-name" maxlength="60">
+    </label>
+    <label class="field">
+      <span class="label">Compte à rebours (s)</span>
+      <input type="number" id="w-countdown" min="0" max="120">
+    </label>
+  </section>
+
+  <section class="blocks" id="blocks" aria-label="Blocs"></section>
+
+  <div class="actions">
+    <button class="btn" id="add-block" type="button">+ Ajouter un bloc</button>
+    <button class="btn" id="apply-all" type="button">Copier le bloc A sur tous</button>
+    <button class="btn" id="save" type="button">Enregistrer</button>
+  </div>
+
+  <section class="saved" aria-label="Séances enregistrées">
+    <span class="label">Mes séances</span>
+    <div id="saved-list"></div>
+  </section>
+</main>
+
+<div class="startbar" id="startbar">
+  <div class="inner">
+    <div class="total"><span class="label">Durée totale</span><b id="total">0:00</b></div>
+    <button class="go" id="go" type="button">Démarrer</button>
+  </div>
+</div>
+
+<section class="run" id="run" hidden data-phase="prep" aria-live="polite">
+  <div class="run-top">
+    <div class="run-block" id="r-block">—</div>
+    <div class="run-total">Restant<b id="r-total">0:00</b></div>
+  </div>
+  <div class="run-center">
+    <div class="phase-pill" id="r-phase">Prêt</div>
+    <div class="clock" id="r-clock">0:10</div>
+    <div class="round" id="r-round"></div>
+    <div class="counter" id="r-counter" hidden>
+      <button class="ctrl" id="c-minus" type="button" aria-label="Retirer un tour">−1</button>
+      <b id="c-val">0</b>
+      <button class="ctrl" id="c-plus" type="button" aria-label="Ajouter un tour">+1 tour</button>
+    </div>
+  </div>
+  <div class="progress"><div id="r-bar"></div></div>
+  <div class="next" id="r-next"></div>
+  <div class="controls">
+    <button class="ctrl" id="b-quit" type="button">Quitter</button>
+    <button class="ctrl" id="b-prev" type="button" aria-label="Étape précédente">◀◀</button>
+    <button class="ctrl big" id="b-pause" type="button">Pause</button>
+    <button class="ctrl" id="b-next" type="button" aria-label="Étape suivante">▶▶</button>
+    <button class="ctrl" id="b-sound" type="button">Son : oui</button>
+    <button class="ctrl" id="b-full" type="button">Plein écran</button>
+  </div>
+</section>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const STORE_KEY = "coaching-timer:saved";
+  const DRAFT_KEY = "coaching-timer:draft";
+
+  // Types de bloc : libellé + valeurs par défaut
+  const KINDS = {
+    interval: { label: "Intervalles", defaults: { rounds: 7, work: 300, rest: 0 } },
+    amrap:    { label: "AMRAP",       defaults: { rounds: 1, work: 720, rest: 0 } },
+    emom:     { label: "EMOM",        defaults: { rounds: 10, work: 60, rest: 0 } },
+    tabata:   { label: "Tabata",      defaults: { rounds: 8, work: 20, rest: 10 } },
+    fortime:  { label: "For Time",    defaults: { rounds: 1, work: 1200, rest: 0 } },
+  };
+
+  const block = (kind, extra = {}) => ({ kind, name: "", restAfter: 60, ...KINDS[kind].defaults, ...extra });
+
+  const TEMPLATES = [
+    { label: "Exemple 5 blocs (7×5′)", make: () => ({
+      name: "5 blocs · 7×5′", countdown: 10,
+      blocks: [0,1,2,3,4].map(() => block("interval", { rounds: 7, work: 300, rest: 0, restAfter: 60 })),
+    })},
+    { label: "AMRAP 12′", make: () => ({ name: "AMRAP 12′", countdown: 10, blocks: [block("amrap", { restAfter: 0 })] }) },
+    { label: "EMOM 10′", make: () => ({ name: "EMOM 10′", countdown: 10, blocks: [block("emom", { restAfter: 0 })] }) },
+    { label: "Tabata", make: () => ({ name: "Tabata", countdown: 10, blocks: [block("tabata", { restAfter: 0 })] }) },
+    { label: "For Time (cap 20′)", make: () => ({ name: "For Time", countdown: 10, blocks: [block("fortime", { restAfter: 0 })] }) },
+    { label: "3 × AMRAP 4′", make: () => ({
+      name: "3 × AMRAP 4′", countdown: 10,
+      blocks: [0,1,2].map(() => block("amrap", { work: 240, restAfter: 60 })),
+    })},
+  ];
+
+  // ---------- Stockage (tolérant aux erreurs) ----------
+  const store = {
+    get(key, fallback) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; } },
+    set(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); return true; } catch { return false; } },
+  };
+
+  let workout = store.get(DRAFT_KEY, null) || TEMPLATES[0].make();
+
+  // ---------- Utilitaires temps ----------
+  const fmt = (s) => {
+    s = Math.max(0, Math.round(s));
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    return h ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}` : `${m}:${String(sec).padStart(2, "0")}`;
+  };
+  const clampInt = (v, min, max) => Math.min(max, Math.max(min, parseInt(v, 10) || 0));
+  const blockName = (b, i) => b.name.trim() || `Bloc ${LETTERS[i] || i + 1}`;
+
+  // ---------- Construction de la séquence ----------
+  function buildSegments(w) {
+    const segs = [];
+    if (w.countdown > 0) segs.push({ phase: "prep", dur: w.countdown, bi: 0, round: 0 });
+    w.blocks.forEach((b, bi) => {
+      for (let r = 1; r <= b.rounds; r++) {
+        if (b.work > 0) segs.push({ phase: "work", dur: b.work, bi, round: r });
+        if (b.rest > 0 && r < b.rounds) segs.push({ phase: "rest", dur: b.rest, bi, round: r });
+      }
+      if (bi < w.blocks.length - 1 && b.restAfter > 0) segs.push({ phase: "blockrest", dur: b.restAfter, bi, round: b.rounds });
+    });
+    return segs;
+  }
+  const blockTotal = (b) => b.rounds * b.work + Math.max(0, b.rounds - 1) * b.rest;
+
+  // ---------- Rendu de l'éditeur ----------
+  function timeInputs(id, secs) {
+    return `<span class="time"><input type="number" id="${id}-m" min="0" max="180" value="${Math.floor(secs / 60)}" aria-label="minutes">′
+      <input type="number" id="${id}-s" min="0" max="59" value="${secs % 60}" aria-label="secondes">″</span>`;
+  }
+
+  function renderEditor() {
+    $("w-name").value = workout.name;
+    $("w-countdown").value = workout.countdown;
+    const last = workout.blocks.length - 1;
+    $("blocks").innerHTML = workout.blocks.map((b, i) => `
+      <article class="block" data-i="${i}">
+        <div class="block-head">
+          <div class="block-letter">${LETTERS[i] || i + 1}</div>
+          <input type="text" id="b${i}-name" data-k="name" value="${escapeAttr(b.name)}" placeholder="Bloc ${LETTERS[i] || i + 1} (nom ou atelier)" maxlength="40">
+          <select id="b${i}-kind" data-k="kind" aria-label="Type de bloc">
+            ${Object.entries(KINDS).map(([k, v]) => `<option value="${k}" ${k === b.kind ? "selected" : ""}>${v.label}</option>`).join("")}
+          </select>
+          <div class="block-tools">
+            <button class="icon-btn" data-act="up" type="button" aria-label="Monter" ${i === 0 ? "disabled" : ""}>↑</button>
+            <button class="icon-btn" data-act="dup" type="button">Dupliquer</button>
+            <button class="icon-btn" data-act="del" type="button" ${workout.blocks.length === 1 ? "disabled" : ""}>Suppr.</button>
+          </div>
+        </div>
+        <div class="field-row">
+          <label class="field"><span class="label">Tours</span>
+            <input type="number" id="b${i}-rounds" data-k="rounds" min="1" max="99" value="${b.rounds}"></label>
+          <div class="field"><span class="label">${b.kind === "fortime" ? "Time cap" : b.kind === "amrap" ? "Durée" : "Travail"}</span>${timeInputs(`b${i}-work`, b.work)}</div>
+          <div class="field"><span class="label">Repos entre tours</span>${timeInputs(`b${i}-rest`, b.rest)}</div>
+          ${i < last ? `<div class="field"><span class="label">Repos après le bloc</span>${timeInputs(`b${i}-after`, b.restAfter)}</div>` : ""}
+        </div>
+        <div class="block-sum">${b.rounds} × ${fmt(b.work)}${b.rest ? ` / repos ${fmt(b.rest)}` : ""} = ${fmt(blockTotal(b))}</div>
+      </article>`).join("");
+    renderTotal();
+  }
+
+  function renderTotal() {
+    const total = buildSegments(workout).reduce((a, s) => a + s.dur, 0);
+    $("total").textContent = fmt(total);
+    workout.blocks.forEach((b, i) => {
+      const el = document.querySelector(`.block[data-i="${i}"] .block-sum`);
+      if (el) el.textContent = `${b.rounds} × ${fmt(b.work)}${b.rest ? ` / repos ${fmt(b.rest)}` : ""} = ${fmt(blockTotal(b))}`;
+    });
+    store.set(DRAFT_KEY, workout);
+  }
+
+  function escapeAttr(s) { return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
+
+  function readTime(prefix) {
+    const m = clampInt($(`${prefix}-m`)?.value, 0, 180), s = clampInt($(`${prefix}-s`)?.value, 0, 59);
+    return m * 60 + s;
+  }
+
+  $("blocks").addEventListener("input", (e) => {
+    const art = e.target.closest(".block"); if (!art) return;
+    const i = +art.dataset.i, b = workout.blocks[i];
+    if (e.target.dataset.k === "name") b.name = e.target.value;
+    else if (e.target.dataset.k === "rounds") b.rounds = clampInt(e.target.value, 1, 99);
+    else if (e.target.dataset.k === "kind") return; // géré par change
+    else {
+      b.work = readTime(`b${i}-work`);
+      b.rest = readTime(`b${i}-rest`);
+      if ($(`b${i}-after-m`)) b.restAfter = readTime(`b${i}-after`);
+    }
+    renderTotal();
+  });
+  $("blocks").addEventListener("change", (e) => {
+    if (e.target.dataset.k !== "kind") return;
+    const i = +e.target.closest(".block").dataset.i;
+    const old = workout.blocks[i];
+    workout.blocks[i] = block(e.target.value, { name: old.name, restAfter: old.restAfter });
+    renderEditor();
+  });
+  $("blocks").addEventListener("click", (e) => {
+    const act = e.target.dataset.act; if (!act) return;
+    const i = +e.target.closest(".block").dataset.i;
+    if (act === "del" && workout.blocks.length > 1) workout.blocks.splice(i, 1);
+    if (act === "dup") workout.blocks.splice(i + 1, 0, { ...workout.blocks[i], name: "" });
+    if (act === "up" && i > 0) [workout.blocks[i - 1], workout.blocks[i]] = [workout.blocks[i], workout.blocks[i - 1]];
+    renderEditor();
+  });
+
+  $("w-name").addEventListener("input", (e) => { workout.name = e.target.value; renderTotal(); });
+  $("w-countdown").addEventListener("input", (e) => { workout.countdown = clampInt(e.target.value, 0, 120); renderTotal(); });
+  $("add-block").addEventListener("click", () => {
+    const prev = workout.blocks[workout.blocks.length - 1];
+    workout.blocks.push(prev ? { ...prev, name: "" } : block("interval"));
+    renderEditor();
+  });
+  $("apply-all").addEventListener("click", () => {
+    const a = workout.blocks[0];
+    workout.blocks = workout.blocks.map((b) => ({ ...a, name: b.name }));
+    renderEditor();
+    toast("Réglages du bloc A copiés");
+  });
+
+  $("templates").innerHTML = TEMPLATES.map((t, i) => `<button class="chip" type="button" data-t="${i}">${t.label}</button>`).join("");
+  $("templates").addEventListener("click", (e) => {
+    const t = e.target.dataset.t; if (t == null) return;
+    workout = TEMPLATES[t].make(); renderEditor();
+  });
+
+  // ---------- Séances enregistrées ----------
+  function renderSaved() {
+    const list = store.get(STORE_KEY, []);
+    $("saved-list").innerHTML = list.length
+      ? list.map((w, i) => `<div class="saved-item">
+          <button class="load" data-load="${i}" type="button">${escapeAttr(w.name || "Sans nom")} <small>· ${w.blocks.length} bloc(s) · ${fmt(buildSegments(w).reduce((a, s) => a + s.dur, 0))}</small></button>
+          <button class="icon-btn" data-delsaved="${i}" type="button">Supprimer</button></div>`).join("")
+      : `<p class="empty">Aucune séance enregistrée. Réglez vos blocs puis touchez « Enregistrer ».</p>`;
+  }
+  $("save").addEventListener("click", () => {
+    const list = store.get(STORE_KEY, []);
+    const name = workout.name.trim() || "Sans nom";
+    const idx = list.findIndex((w) => w.name === name);
+    const copy = JSON.parse(JSON.stringify({ ...workout, name }));
+    if (idx >= 0) list[idx] = copy; else list.unshift(copy);
+    toast(store.set(STORE_KEY, list) ? `« ${name} » enregistrée` : "Impossible d'enregistrer dans ce navigateur");
+    renderSaved();
+  });
+  $("saved-list").addEventListener("click", (e) => {
+    const list = store.get(STORE_KEY, []);
+    const l = e.target.closest("[data-load]"), d = e.target.closest("[data-delsaved]");
+    if (l) { workout = JSON.parse(JSON.stringify(list[+l.dataset.load])); renderEditor(); window.scrollTo({ top: 0 }); }
+    if (d) {
+      if (d.dataset.armed) { list.splice(+d.dataset.delsaved, 1); store.set(STORE_KEY, list); renderSaved(); }
+      else { d.dataset.armed = "1"; d.textContent = "Confirmer ?"; }
+    }
+  });
+
+  let toastTimer;
+  function toast(msg) {
+    const t = $("toast"); t.textContent = msg; t.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 1800);
+  }
+
+  // ---------- Audio ----------
+  let ctx = null, soundOn = true;
+  function beep(freq = 880, dur = 0.12, vol = 0.5) {
+    if (!soundOn || !ctx) return;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = "square"; o.frequency.value = freq;
+    const t = ctx.currentTime;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g).connect(ctx.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  const vibrate = (p) => { try { navigator.vibrate?.(p); } catch {} };
+
+  // ---------- Moteur du timer ----------
+  const S = { segs: [], idx: 0, segStart: 0, pausedAt: null, timer: null, lastBeep: null, counts: {}, done: false };
+  const now = () => performance.now();
+
+  let wakeLock = null;
+  async function keepAwake() { try { wakeLock = await navigator.wakeLock?.request("screen"); } catch { wakeLock = null; } }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && !$("run").hidden) keepAwake(); });
+
+  function start() {
+    try { ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); ctx.resume?.(); } catch { ctx = null; }
+    S.segs = buildSegments(workout);
+    if (!S.segs.length) { toast("Ajoutez au moins un temps de travail"); return; }
+    S.idx = 0; S.segStart = now(); S.pausedAt = null; S.counts = {}; S.done = false; S.lastBeep = null;
+    $("editor").hidden = true; $("startbar").hidden = true; $("run").hidden = false;
+    keepAwake();
+    onSegmentStart();
+    clearInterval(S.timer); S.timer = setInterval(tick, 100);
+    tick();
+  }
+
+  function stop() {
+    clearInterval(S.timer); S.timer = null;
+    try { wakeLock?.release(); } catch {} wakeLock = null;
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+    $("run").hidden = true; $("editor").hidden = false; $("startbar").hidden = false;
+    $("b-quit").textContent = "Quitter"; delete $("b-quit").dataset.armed;
+  }
+
+  function onSegmentStart() {
+    const seg = S.segs[S.idx]; S.lastBeep = null;
+    if (seg.phase === "work") { beep(1320, 0.5, 0.6); vibrate(300); }
+    else if (seg.phase === "rest" || seg.phase === "blockrest") { beep(520, 0.5, 0.6); vibrate([150, 80, 150]); }
+  }
+
+  function goTo(idx) {
+    if (idx < 0) idx = 0;
+    if (idx >= S.segs.length) return finish();
+    S.idx = idx; S.done = false;
+    S.segStart = now(); if (S.pausedAt != null) S.pausedAt = S.segStart;
+    onSegmentStart(); render();
+  }
+
+  function finish() {
+    S.done = true; S.idx = S.segs.length - 1;
+    clearInterval(S.timer); S.timer = null;
+    [0, 250, 500].forEach((d) => setTimeout(() => beep(1320, 0.18, 0.6), d));
+    vibrate([200, 100, 200, 100, 400]);
+    render();
+  }
+
+  function tick() {
+    if (S.done || S.pausedAt != null) return;
+    let t = now();
+    // Avance en conservant le temps écoulé (pas de dérive)
+    while (!S.done && (t - S.segStart) / 1000 >= S.segs[S.idx].dur) {
+      S.segStart += S.segs[S.idx].dur * 1000;
+      if (S.idx + 1 >= S.segs.length) return finish();
+      S.idx++; onSegmentStart();
+    }
+    const seg = S.segs[S.idx];
+    const remaining = seg.dur - (t - S.segStart) / 1000;
+    const secLeft = Math.ceil(remaining);
+    if (secLeft <= 3 && secLeft >= 1 && S.lastBeep !== secLeft) { S.lastBeep = secLeft; beep(880, 0.15, 0.5); }
+    render(remaining);
+  }
+
+  function render(remaining) {
+    const run = $("run");
+    if (S.done) {
+      run.dataset.phase = "done";
+      $("r-phase").textContent = "Terminé";
+      $("r-clock").textContent = "0:00";
+      $("r-round").textContent = "Bravo !";
+      $("r-next").textContent = workout.name;
+      $("r-total").textContent = "0:00";
+      $("r-bar").style.width = "100%";
+      $("r-counter").hidden = true;
+      $("b-pause").textContent = "Recommencer";
+      return;
+    }
+    const seg = S.segs[S.idx];
+    const elapsedNow = ((S.pausedAt ?? now()) - S.segStart) / 1000;
+    if (remaining == null) remaining = seg.dur - elapsedNow;
+    const b = workout.blocks[seg.bi];
+    const kindLabel = KINDS[b.kind].label;
+    run.dataset.phase = seg.phase;
+
+    $("r-block").innerHTML = `${escapeAttr(blockName(b, seg.bi))}<small>${kindLabel} · bloc ${seg.bi + 1}/${workout.blocks.length}</small>`;
+    $("r-phase").textContent = { prep: "Préparez-vous", work: kindLabel === "Intervalles" ? "Travail" : kindLabel, rest: "Repos", blockrest: "Repos entre blocs" }[seg.phase];
+
+    // For Time : le chrono monte ; sinon il descend
+    const up = seg.phase === "work" && b.kind === "fortime";
+    $("r-clock").textContent = up ? fmt(Math.floor(seg.dur - remaining)) : fmt(Math.ceil(remaining));
+
+    $("r-round").innerHTML = seg.phase === "prep" ? "" :
+      seg.phase === "blockrest" ? `Bloc ${LETTERS[seg.bi] || seg.bi + 1} terminé` :
+      b.rounds > 1 ? `Tour ${seg.round} <span>/ ${b.rounds}</span>` : "";
+
+    const showCounter = seg.phase === "work" && (b.kind === "amrap" || b.kind === "fortime");
+    $("r-counter").hidden = !showCounter;
+    if (showCounter) $("c-val").textContent = S.counts[`${seg.bi}-${seg.round}`] || 0;
+    $("b-next").textContent = seg.phase === "work" && b.kind === "fortime" ? "Fini !" : "▶▶";
+    $("b-next").classList.toggle("done", seg.phase === "work" && b.kind === "fortime");
+
+    $("r-bar").style.width = `${Math.min(100, Math.max(0, (1 - remaining / seg.dur) * 100))}%`;
+    const rest = remaining + S.segs.slice(S.idx + 1).reduce((a, s) => a + s.dur, 0);
+    $("r-total").textContent = fmt(Math.ceil(rest));
+
+    const nx = S.segs[S.idx + 1];
+    if (!nx) $("r-next").textContent = "Dernière étape";
+    else {
+      const nb = workout.blocks[nx.bi];
+      const what = nx.phase === "work" ? `${escapeAttr(blockName(nb, nx.bi))}${nb.rounds > 1 ? ` · tour ${nx.round}` : ""}` : nx.phase === "rest" ? "Repos" : "Repos entre blocs";
+      $("r-next").innerHTML = `Ensuite : <b>${what}</b> · ${fmt(nx.dur)}`;
+    }
+    $("b-pause").textContent = S.pausedAt != null ? "Reprendre" : "Pause";
+  }
+
+  // ---------- Contrôles ----------
+  $("go").addEventListener("click", start);
+  $("b-pause").addEventListener("click", () => {
+    if (S.done) { start(); return; }
+    if (S.pausedAt == null) { S.pausedAt = now(); }
+    else { S.segStart += now() - S.pausedAt; S.pausedAt = null; ctx?.resume?.(); }
+    render();
+  });
+  $("b-next").addEventListener("click", () => { if (!S.done) goTo(S.idx + 1); });
+  $("b-prev").addEventListener("click", () => {
+    if (S.done) { S.done = false; S.timer = setInterval(tick, 100); goTo(S.segs.length - 1); return; }
+    // Si l'étape a commencé depuis plus de 3 s, on la relance ; sinon on recule
+    const elapsed = ((S.pausedAt ?? now()) - S.segStart) / 1000;
+    goTo(elapsed > 3 ? S.idx : S.idx - 1);
+  });
+  $("b-quit").addEventListener("click", (e) => {
+    const btn = e.currentTarget;
+    if (S.done || btn.dataset.armed) return stop();
+    btn.dataset.armed = "1"; btn.textContent = "Confirmer ?";
+    setTimeout(() => { delete btn.dataset.armed; btn.textContent = "Quitter"; }, 3000);
+  });
+  $("b-sound").addEventListener("click", () => { soundOn = !soundOn; $("b-sound").textContent = `Son : ${soundOn ? "oui" : "non"}`; });
+  $("b-full").addEventListener("click", () => {
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+    else $("run").requestFullscreen?.().catch(() => toast("Plein écran indisponible ici"));
+  });
+  const bump = (d) => {
+    const seg = S.segs[S.idx], k = `${seg.bi}-${seg.round}`;
+    S.counts[k] = Math.max(0, (S.counts[k] || 0) + d); render();
+  };
+  $("c-plus").addEventListener("click", () => bump(1));
+  $("c-minus").addEventListener("click", () => bump(-1));
+  document.addEventListener("keydown", (e) => {
+    if ($("run").hidden) return;
+    if (e.code === "Space") { e.preventDefault(); $("b-pause").click(); }
+    if (e.code === "ArrowRight") $("b-next").click();
+    if (e.code === "ArrowLeft") $("b-prev").click();
+  });
+
+  renderEditor();
+  renderSaved();
+})();
+</script>
+</body>
+</html>
