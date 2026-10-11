@@ -173,8 +173,6 @@ input[type="number"] { width: 4.2em; text-align: center; font-family: var(--font
 .notice { border-left: 3px solid var(--accent); padding: 4px 0 4px 12px; color: var(--muted); font-size: .9rem; margin: 0; max-width: 64ch; }
 .notice b { color: var(--fg); }
 input[type="range"] { accent-color: var(--accent); width: 100%; max-width: 260px; }
-.tracklist { margin: 0; padding-left: 1.4em; color: var(--muted); font-size: .88rem; max-height: 8em; overflow: auto; }
-.tracklist li.on { color: var(--fg); font-weight: 600; }
 
 .session-time { display: flex; flex-direction: column; gap: 10px; border-left: 3px solid var(--accent); padding-left: 12px; }
 .run-total b.over { color: var(--rest); }
@@ -398,17 +396,6 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
       </div>
     </div>
 
-    <div class="section">
-      <span class="label">Ou vos fichiers audio</span>
-      <div class="actions">
-        <label class="btn" for="local-files" style="cursor:pointer">Choisir des morceaux</label>
-        <input type="file" id="local-files" accept="audio/*" multiple hidden>
-        <button class="icon-btn" id="lc-toggle" type="button" disabled>Lecture / Pause</button>
-        <button class="icon-btn" id="lc-next" type="button" disabled aria-label="Morceau suivant">⏭</button>
-        <label class="field" style="flex:1 1 160px"><span class="label">Volume</span><input type="range" id="lc-vol" min="0" max="100" value="80"></label>
-      </div>
-      <ol class="tracklist" id="lc-list" hidden></ol>
-    </div>
 
     <div class="section">
       <span class="label">Pendant la séance</span>
@@ -918,33 +905,6 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   }
   const vibrate = (p) => { try { navigator.vibrate?.(p); } catch {} };
 
-  // ---------- Musique : fichiers locaux ----------
-  const lc = { audio: new Audio(), files: [], i: 0, url: null };
-  lc.audio.volume = 0.8;
-  lc.audio.addEventListener("ended", () => lcPlay(lc.i + 1));
-  function lcPlay(i) {
-    if (!lc.files.length) return;
-    lc.i = (i + lc.files.length) % lc.files.length;
-    if (lc.url) URL.revokeObjectURL(lc.url);
-    lc.url = URL.createObjectURL(lc.files[lc.i]);
-    lc.audio.src = lc.url; lc.audio.play().catch(() => {});
-    renderLocal();
-  }
-  function renderLocal() {
-    $("lc-list").hidden = !lc.files.length;
-    $("lc-list").innerHTML = lc.files.map((f, i) => `<li class="${i === lc.i ? "on" : ""}">${esc(f.name.replace(/\.[^.]+$/, ""))}</li>`).join("");
-    $("lc-toggle").disabled = $("lc-next").disabled = !lc.files.length;
-    updateMini();
-  }
-  $("local-files").addEventListener("change", (e) => {
-    lc.files = [...e.target.files]; lc.i = 0;
-    if (lc.files.length) { lc.audio.src = lc.url = URL.createObjectURL(lc.files[0]); toast(`${lc.files.length} morceau(x) prêt(s)`); }
-    renderLocal();
-  });
-  $("lc-toggle").addEventListener("click", () => { if (lc.audio.paused) lc.audio.play().catch(() => {}); else lc.audio.pause(); });
-  $("lc-next").addEventListener("click", () => lcPlay(lc.i + 1));
-  $("lc-vol").addEventListener("input", (e) => { lc.base = +e.target.value / 100; if (!music.ducked) lc.audio.volume = lc.base; });
-  lc.base = 0.8;
 
   // ---------- Musique : Spotify (Web API, PKCE) ----------
   // Fonctionne uniquement quand l'app est ouverte à sa propre adresse (pas dans une page intégrée),
@@ -1061,7 +1021,6 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   function duck(on) {
     if (!prefs.duck || music.ducked === on) return;
     music.ducked = on;
-    if (lc.files.length) lc.audio.volume = on ? lc.base * 0.25 : lc.base;
     if (spOn() && spState?.is_playing) {
       if (on) { music.spBase = +$("sp-vol").value || spState.device?.volume_percent || 50; spVolume(music.spBase * 0.3); }
       else if (music.spBase != null) spVolume(music.spBase);
@@ -1069,17 +1028,14 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   }
   function musicStart() {
     if (!prefs.autoplay) return;
-    if (lc.files.length) lc.audio.play().catch(() => {});
     if (spOn()) spPlay(playlistUri(prefs.spPlaylist));
   }
   function musicPause(paused) {
     if (!prefs.pauseMusic) return;
     if (paused) {
-      music.wasPlaying = (lc.files.length && !lc.audio.paused) || !!spState?.is_playing;
-      if (lc.files.length) lc.audio.pause();
+      music.wasPlaying = !!spState?.is_playing;
       if (spOn() && spState?.is_playing) spPause();
     } else if (music.wasPlaying) {
-      if (lc.files.length) lc.audio.play().catch(() => {});
       if (spOn()) spPlay();
     }
   }
@@ -1087,11 +1043,8 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     const el = $("r-music");
     let txt = "";
     if (spOn() && spState?.item) txt = `♪ ${spState.item.name} · ${(spState.item.artists || []).map((a) => a.name).join(", ")}`;
-    else if (lc.files.length && !lc.audio.paused) txt = `♪ ${lc.files[lc.i].name.replace(/\.[^.]+$/, "")}`;
     el.textContent = txt; el.hidden = !txt;
   }
-  lc.audio.addEventListener("play", updateMini);
-  lc.audio.addEventListener("pause", updateMini);
 
   // ---------- Options d'affichage ----------
   function applyPrefs() {
@@ -1137,7 +1090,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   function exitScreen() {
     if (currentScreen() === "run") {
       clearInterval(S.timer); S.timer = null; duck(false);
-      if (prefs.pauseMusic) { if (lc.files.length) lc.audio.pause(); if (spOn() && spState?.is_playing) spPause(); }
+      if (prefs.pauseMusic) { if (spOn() && spState?.is_playing) spPause(); }
       try { speechSynthesis.cancel(); } catch {}
       stopApplause();
     }
