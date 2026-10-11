@@ -672,9 +672,14 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
         setTimeout(() => { if (del.isConnected) { delete del.dataset.armed; del.textContent = "✕"; del.classList.remove("armed"); } }, 3000);
         return;
       }
-      const n = del.dataset.clearslot;
-      const list = store.get(K.saved, []).filter((x) => String(x.slot) !== String(n));
-      store.set(K.saved, list); renderSaved(); toast(`Touche ${n} vidée`);
+      const n = del.dataset.clearslot, all = store.get(K.saved, []);
+      const removed = all.find((x) => String(x.slot) === String(n));
+      const list = all.filter((x) => x !== removed);
+      store.set(K.saved, list);
+      // La séance affichée vient de cette touche, ou plus aucune touche n'est remplie : retour à 0:00
+      const noSlotLeft = !list.some((x) => SLOTS.includes(x.slot));
+      if (noSlotLeft || (removed && removed.name === (workout.name.trim() || "Sans nom"))) { workout = emptyWorkout(); $("save-slot").value = ""; renderEditor(); }
+      renderSaved(); toast(`Touche ${n} vidée`);
       return;
     }
     const s = e.target.closest(".slot.filled"); if (s) launchSlot(s.dataset.slot);
@@ -797,14 +802,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     document.querySelector(`.block[data-i="${workout.blocks.length - 1}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
   });
   // Remise à zéro de la séance en cours (les touches 1–5 enregistrées ne sont pas touchées)
-  function armedReset(e) {
-    const btn = e.currentTarget, label = btn.dataset.label ||= btn.textContent;
-    if (!btn.dataset.armed) {
-      btn.dataset.armed = "1"; btn.textContent = "Confirmer ?"; btn.classList.add("armed");
-      setTimeout(() => { delete btn.dataset.armed; btn.textContent = label; btn.classList.remove("armed"); }, 3000);
-      return;
-    }
-    delete btn.dataset.armed; btn.textContent = label; btn.classList.remove("armed");
+  function armedReset() {
     workout = emptyWorkout(); $("save-slot").value = ""; renderEditor(); toast("Séance remise à zéro");
   }
   $("clear").addEventListener("click", armedReset);
