@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;800&family=Barlow:wght@400;500;600&family=Chivo+Mono:wght@600;800&display=swap">
 <style>
-/* Layout : accueil type télécommande (modes + touches 0–9) → éditeur de blocs → écran plein façon horloge de box */
+/* Layout : 4 onglets en bas (Séance, Mes séances, Musique, Réglages), cartes empilées → écran plein façon horloge de box */
 :root {
   color-scheme: dark;
   --bg: #0e1012;
@@ -42,22 +42,36 @@ button { cursor: pointer; }
 button:disabled { opacity: .4; cursor: default; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* ---------- Accueil / éditeur ---------- */
-.editor {
+/* ---------- Application : en-tête, onglets, panneaux ---------- */
+.app {
   max-width: 760px;
   margin: 0 auto;
   padding-inline: 16px;
-  padding-block: 20px 130px;
+  padding-block: 16px calc(190px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 18px;
 }
-.brand { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.brand h1 { margin: 0; font: 800 2rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .02em; }
-.brand h1 span { color: var(--accent); }
-.brand p { margin: 0; color: var(--muted); font-size: .9rem; }
+.app.no-startbar { padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.topbar h1 { margin: 0; font: 800 1.7rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .02em; }
+.topbar h1 span { color: var(--accent); }
+.tools { display: flex; gap: 8px; }
+.tool {
+  border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 8px 12px;
+  font: 700 .85rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .06em;
+}
+.tool:hover { border-color: var(--muted); }
 
-.section { display: flex; flex-direction: column; gap: 10px; }
+.panel { display: flex; flex-direction: column; gap: 16px; }
+.panel-title { margin: 0; font: 800 1.35rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .04em; }
+
+/* Carte : un bloc visuel par sujet */
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.card-title { margin: 0; font: 800 1.05rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .06em; }
+.card-note { color: var(--muted); font-size: .85rem; }
+
 .label {
   font: 700 .78rem/1 var(--font-display);
   text-transform: uppercase;
@@ -65,147 +79,169 @@ button:disabled { opacity: .4; cursor: default; }
   color: var(--muted);
 }
 .hint { margin: 0; color: var(--muted); font-size: .88rem; max-width: 62ch; }
+.hint a { color: var(--accent); }
+.empty { color: var(--muted); font-size: .92rem; margin: 0; }
 
-/* Touches de mode, comme la télécommande */
-.modes { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
-.mode {
+.field-row { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: end; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field.grow { flex: 1 1 200px; }
+.field.full { flex: 1 1 100%; }
+input[type="text"], input[type="number"], select {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  min-width: 0;
+}
+input[type="number"] { width: 4.2em; text-align: center; font-family: var(--font-digits); font-variant-numeric: tabular-nums; }
+.time { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-digits); }
+.check { display: inline-flex; align-items: center; gap: 10px; font-size: .95rem; }
+.check input { width: 20px; height: 20px; accent-color: var(--accent); flex: none; }
+
+/* Liste des timers : résumé, touchez pour modifier */
+.timers { display: flex; flex-direction: column; gap: 8px; }
+.timer { border: 1px solid var(--line); border-radius: 12px; background: var(--bg); overflow: hidden; }
+.timer.open { border-color: var(--accent); }
+.timer-row {
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px;
+  background: none; border: none; text-align: left;
+}
+.timer-letter {
+  width: 34px; height: 34px; flex: none; display: grid; place-items: center;
+  background: var(--accent); color: var(--on-accent); border-radius: 8px;
+  font: 800 1.15rem/1 var(--font-display);
+}
+.timer-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.timer-main b { font: 700 1.05rem/1.1 var(--font-display); text-transform: uppercase; letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timer-main span { color: var(--muted); font: 600 .85rem/1.2 var(--font-digits); }
+.timer-chev { color: var(--muted); font-size: .9rem; flex: none; }
+.timer-edit { border-top: 1px solid var(--line); padding: 14px 12px; display: flex; flex-direction: column; gap: 14px; }
+.timer-tools { display: flex; flex-wrap: wrap; gap: 8px; }
+.between { display: flex; align-items: center; gap: 8px; padding-left: 22px; color: var(--muted); font-size: .82rem; }
+.between::before { content: ""; width: 2px; height: 14px; background: var(--line); }
+
+.icon-btn {
+  border: 1px solid var(--line); background: transparent;
+  border-radius: 8px; padding: 8px 12px; font-size: .88rem; color: var(--muted);
+}
+.icon-btn:hover:not(:disabled) { color: var(--fg); border-color: var(--muted); }
+.icon-btn.danger:hover:not(:disabled) { color: var(--rest); border-color: var(--rest); }
+
+.add-btn {
+  border: 1.5px dashed var(--line); background: transparent; border-radius: 12px; padding: 14px;
+  font: 700 1rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .06em; color: var(--accent);
+}
+.add-btn:hover { border-color: var(--accent); }
+.kind-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.kind {
+  border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 12px;
+  display: flex; flex-direction: column; gap: 4px; text-align: left;
+}
+.kind b { font: 700 1rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .05em; }
+.kind small { color: var(--muted); font-size: .8rem; line-height: 1.25; }
+.kind:hover { border-color: var(--accent); }
+
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.btn {
   border: 1px solid var(--line); background: var(--panel);
-  border-radius: 12px; padding: 12px 8px;
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  font: 700 1rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .05em;
+  border-radius: 10px; padding: 12px 16px;
+  font: 700 1rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .06em;
 }
-.mode small { font: 500 .72rem/1.2 var(--font-body); color: var(--muted); text-transform: none; letter-spacing: 0; text-align: center; }
-.mode .key {
-  font: 800 .72rem/1 var(--font-display); letter-spacing: .08em;
-  border: 1.5px solid var(--rest); color: var(--rest); border-radius: 99px; padding: 3px 7px;
-}
-.mode:hover { border-color: var(--accent); }
+.btn:hover:not(:disabled) { border-color: var(--muted); }
+.btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.btn.spotify { background: var(--spotify); color: var(--on-accent); border-color: var(--spotify); }
 
-/* Pavé 0–9 */
+/* Touches 1–5 */
 .keypad { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
 .slot-wrap { position: relative; display: flex; min-width: 0; }
 .slot-wrap .slot { flex: 1; }
+.slot {
+  border: 1px solid var(--line); background: transparent; border-radius: 10px;
+  min-height: 72px; padding: 8px 6px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-width: 0;
+}
+.slot b { font: 800 1.4rem/1 var(--font-digits); }
+.slot span { font-size: .74rem; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slot.filled { background: var(--bg); }
+.slot.filled b { color: var(--accent); }
+.slot:not(.filled) { border-style: dashed; cursor: default; }
 .slot-del {
   position: absolute; top: -8px; right: -6px;
-  border: 1px solid var(--line); background: var(--bg); color: var(--muted);
+  border: 1px solid var(--line); background: var(--panel); color: var(--muted);
   border-radius: 99px; min-width: 26px; height: 26px; padding: 0 7px; font-size: .75rem; line-height: 1;
 }
 .slot-del:hover { color: var(--rest); border-color: var(--rest); }
 .slot-del.armed { background: var(--rest); color: var(--on-accent); border-color: var(--rest); font-weight: 700; z-index: 1; }
-.slot {
-  border: 1px solid var(--line); background: transparent; border-radius: 10px;
-  min-height: 64px; padding: 8px 6px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 0;
-}
-.slot b { font: 800 1.3rem/1 var(--font-digits); }
-.slot span { font-size: .72rem; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.slot.filled { background: var(--panel); }
-.slot.filled b { color: var(--accent); }
-.slot:not(.filled) { border-style: dashed; cursor: default; }
 
-.field-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
-.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.field.grow { flex: 1 1 220px; }
-.field.full { flex: 1 1 100%; }
-input[type="text"], input[type="number"], select, textarea {
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 9px 10px;
-  min-width: 0;
-}
-textarea { resize: vertical; min-height: 2.6em; }
-input[type="number"] { width: 4.2em; text-align: center; font-family: var(--font-digits); font-variant-numeric: tabular-nums; }
-.time { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-digits); }
-.check { display: inline-flex; align-items: center; gap: 8px; font-size: .92rem; }
-.check input { width: 18px; height: 18px; accent-color: var(--accent); }
-
-.templates { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip {
-  border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 7px 14px;
-  font: 600 .95rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .05em;
-}
-.chip:hover { border-color: var(--accent); color: var(--accent); }
-
-.blocks { display: flex; flex-direction: column; gap: 12px; }
-.block {
-  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
-  padding: 14px; display: flex; flex-direction: column; gap: 12px;
-}
-.block-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.block-letter {
-  width: 40px; height: 40px; flex: none; display: grid; place-items: center;
-  background: var(--accent); color: var(--on-accent); border-radius: 8px;
-  font: 800 1.4rem/1 var(--font-display);
-}
-.block-head input[type="text"] { flex: 1 1 140px; }
-.block-tools { display: flex; gap: 6px; margin-left: auto; }
-.icon-btn {
-  border: 1px solid var(--line); background: transparent;
-  border-radius: 8px; padding: 6px 10px; font-size: .85rem; color: var(--muted);
-}
-.icon-btn:hover:not(:disabled) { color: var(--fg); border-color: var(--muted); }
-.block-sum { color: var(--muted); font-size: .88rem; font-family: var(--font-digits); }
-
-.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-.btn {
-  border: 1px solid var(--line); background: var(--panel);
-  border-radius: 10px; padding: 11px 16px;
-  font: 700 1rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .06em;
-}
-.btn:hover:not(:disabled) { border-color: var(--muted); }
-.btn.spotify { background: var(--spotify); color: var(--on-accent); border-color: var(--spotify); }
-
-.saved-item { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--line); padding-block: 8px; }
-.saved-item button.load { flex: 1; text-align: left; background: none; border: none; padding: 0; min-width: 0; }
+.saved-item { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); padding-block: 10px; }
+.saved-item:last-child { border-bottom: none; }
+.saved-item button.load { flex: 1; text-align: left; background: none; border: none; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.saved-item button.load b { font-weight: 600; }
 .saved-item small { color: var(--muted); font-family: var(--font-digits); }
-.saved-item .slotno { font: 800 .9rem/1 var(--font-digits); color: var(--accent); width: 1.6em; text-align: center; }
-.empty { color: var(--muted); font-size: .9rem; margin: 0; }
+.saved-item .slotno {
+  width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 8px;
+  border: 1px solid var(--line); font: 800 .9rem/1 var(--font-digits); color: var(--muted);
+}
+.saved-item .slotno.on { color: var(--accent); border-color: var(--accent); }
 
-/* Panneau musique */
-.music { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
-.music h3 { margin: 0; font: 800 1.15rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .05em; }
+/* Musique */
 .now { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.now img { width: 48px; height: 48px; border-radius: 6px; flex: none; background: var(--line); }
+.now img { width: 52px; height: 52px; border-radius: 6px; flex: none; background: var(--line); }
 .now div { min-width: 0; }
 .now b, .now span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .now span { color: var(--muted); font-size: .88rem; }
-.notice { border-left: 3px solid var(--accent); padding: 4px 0 4px 12px; color: var(--muted); font-size: .9rem; margin: 0; max-width: 64ch; }
+.notice { border-left: 3px solid var(--accent); padding: 4px 0 4px 12px; color: var(--muted); font-size: .92rem; margin: 0; max-width: 64ch; }
 .notice b { color: var(--fg); }
-input[type="range"] { accent-color: var(--accent); width: 100%; max-width: 260px; }
+.steps { margin: 0; padding-left: 1.3em; color: var(--muted); font-size: .9rem; display: flex; flex-direction: column; gap: 6px; }
+.steps b { color: var(--fg); font-weight: 600; }
+.copybox { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.copybox code { font-family: var(--font-digits); font-size: .85rem; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; flex: 1 1 220px; min-width: 0; }
+.error { color: var(--rest); font-size: .88rem; margin: 0; }
+input[type="range"] { accent-color: var(--accent); width: 100%; max-width: 280px; }
 
-.session-time { display: flex; flex-direction: column; gap: 10px; border-left: 3px solid var(--accent); padding-left: 12px; }
-.run-total b.over { color: var(--rest); }
-details.examples { display: flex; flex-direction: column; gap: 10px; }
-details.examples[open] summary { margin-bottom: 10px; }
-details.examples .hint { margin-bottom: 10px; }
-details.examples summary, details.help summary { cursor: pointer; font: 700 .95rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
-.keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin-top: 12px; font-size: .9rem; }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; font-size: .9rem; }
 .keys kbd {
   font: 600 .8rem/1 var(--font-digits); border: 1px solid var(--line); border-bottom-width: 2px;
   border-radius: 6px; padding: 4px 7px; white-space: nowrap; justify-self: start;
 }
+.run-total b.over { color: var(--rest); }
 
+/* Barre Démarrer (onglet Séance) au-dessus des onglets */
 .startbar {
-  position: fixed; left: 0; right: 0; bottom: 0;
-  background: linear-gradient(transparent, var(--bg) 35%);
-  padding: 28px 16px calc(16px + env(safe-area-inset-bottom, 0px));
-  display: flex; justify-content: center;
+  position: fixed; left: 0; right: 0; bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(transparent, var(--bg) 30%);
+  padding: 22px 16px 12px;
+  display: flex; justify-content: center; z-index: 4;
 }
-.startbar .inner { width: 100%; max-width: 760px; display: flex; align-items: center; gap: 14px; }
+.startbar .inner { width: 100%; max-width: 760px; display: flex; align-items: center; gap: 10px; }
 .total { flex: 1; min-width: 0; }
 .total .label { white-space: nowrap; }
-.total b { display: block; font: 800 1.6rem/1 var(--font-digits); }
+.total b { display: block; font: 800 1.6rem/1 var(--font-digits); margin-top: 4px; }
 .zero {
-  border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 12px 14px;
-  font: 700 .95rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .06em;
+  border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 13px 12px;
+  font: 700 .9rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .06em;
 }
-.zero.armed { background: var(--rest); color: var(--on-accent); border-color: var(--rest); }
 .go:disabled { background: var(--line); color: var(--muted); }
 .go {
-  background: var(--work); color: var(--on-accent); border: none; border-radius: 12px; padding: 16px 28px;
-  font: 800 1.35rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em;
+  background: var(--work); color: var(--on-accent); border: none; border-radius: 12px; padding: 15px 22px;
+  font: 800 1.3rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em;
 }
+
+/* Onglets en bas */
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  background: var(--panel); border-top: 1px solid var(--line);
+  padding: 0 8px env(safe-area-inset-bottom, 0px);
+  display: flex; justify-content: center;
+}
+.tabbar .inner { width: 100%; max-width: 760px; display: grid; grid-template-columns: repeat(4, 1fr); }
+.tab {
+  background: none; border: none; height: 64px; color: var(--muted);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  font: 700 .78rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em;
+}
+.tab svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tab[aria-selected="true"] { color: var(--accent); }
 .toast {
   position: fixed; top: calc(14px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
   background: var(--fg); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-weight: 600; z-index: 9;
@@ -294,143 +330,148 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
 </head>
 <body>
 
-<main class="editor" id="editor">
-  <header class="brand">
+<main class="app" id="editor">
+  <header class="topbar">
     <h1>Coaching <span>Timer</span></h1>
-    <p>Blocs, tours, repos, musique. Comme l'horloge de la box.</p>
+    <div class="tools">
+      <button class="tool" id="open-sw" type="button">Chrono</button>
+      <button class="tool" id="open-ck" type="button">Horloge</button>
+    </div>
   </header>
 
-  <section class="section" aria-labelledby="modes-title">
-    <span class="label" id="modes-title">Modes</span>
-    <div class="modes" id="modes"></div>
-  </section>
-
-  <section class="section" aria-labelledby="slots-title">
-    <span class="label" id="slots-title">Touches rapides 1–5</span>
-    <div class="keypad" id="keypad"></div>
-    <p class="hint">Enregistrez une séance sur une touche (en bas de page), puis touchez-la pour la lancer. La croix ✕ vide la touche.</p>
-  </section>
-
-  <section class="section" aria-labelledby="build-title">
-    <span class="label" id="build-title">Construire la séance</span>
-    <div class="field-row">
-      <label class="field grow">
+  <!-- Onglet 1 : la séance -->
+  <section class="panel" id="tab-seance" data-panel="seance" aria-labelledby="t-seance">
+    <div class="card">
+      <h2 class="card-title">Ma séance</h2>
+      <label class="field full">
         <span class="label">Nom</span>
-        <input type="text" id="w-name" maxlength="60">
+        <input type="text" id="w-name" maxlength="60" placeholder="Ex. EPMSP">
       </label>
-      <label class="field">
-        <span class="label">Préparation (s)</span>
-        <input type="number" id="w-countdown" min="0" max="120">
-      </label>
-    </div>
-    <div class="session-time">
-      <div class="field">
-        <span class="label">Durée de la séance (facultatif)</span>
-        <span class="time"><input type="number" id="w-total-m" min="0" max="300" aria-label="minutes">′
-          <input type="number" id="w-total-s" min="0" max="59" aria-label="secondes">″</span>
-      </div>
-      <label class="check"><input type="checkbox" id="w-waitfirst"> Attendre mon signal avant le premier timer</label>
-      <p class="hint">Ce chrono démarre quand vous touchez « Démarrer » et tourne en continu, en même temps que vos timers, même pendant les pauses et les attentes. À 0, ça sonne. Laissez 0′ 0″ pour ne pas l'utiliser.</p>
-    </div>
-  </section>
-
-  <section class="blocks" id="blocks" aria-label="Blocs"></section>
-
-  <div class="actions">
-    <span class="label" style="flex-basis:100%">Ajouter un timer à la suite</span>
-    <div class="templates" id="add-kinds"></div>
-    <button class="btn" id="apply-all" type="button">Copier le bloc A sur tous</button>
-    <button class="btn" id="clear" type="button">Tout effacer</button>
-  </div>
-
-  <details class="examples">
-    <summary>Exemples</summary>
-    <p class="hint">Un exemple remplace la séance en cours. Tous les chiffres restent modifiables.</p>
-    <div class="templates" id="templates"></div>
-  </details>
-
-  <section class="section" aria-labelledby="save-title">
-    <span class="label" id="save-title">Mes séances</span>
-    <div class="actions">
-      <label class="field"><span class="label">Touche</span>
-        <select id="save-slot">
-          <option value="">Aucune</option>
-          <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
-        </select>
-      </label>
-      <button class="btn" id="save" type="button" style="align-self:end">Enregistrer cette séance</button>
-    </div>
-    <div id="saved-list"></div>
-  </section>
-
-  <section class="music" aria-labelledby="music-title">
-    <h3 id="music-title">Musique</h3>
-
-    <div class="section" id="sp-box">
-      <span class="label">Spotify</span>
-      <div id="sp-embedded" hidden>
-        <p class="notice">Sur cette page, le timer ne peut pas piloter Spotify : elle bloque les connexions vers d'autres sites. <b>Lancez votre playlist dans l'app Spotify</b>, puis revenez ici. Les bips jouent par-dessus la musique. Pour que le timer contrôle Spotify (lecture, pause, baisse du volume pendant les bips), ouvrez la version hébergée de l'application.</p>
-      </div>
-      <div id="sp-setup" hidden>
-        <p class="hint">Nécessite un compte <b>Spotify Premium</b> et un « Client ID » créé sur developer.spotify.com, avec cette adresse comme Redirect URI :</p>
-        <code id="sp-redirect" style="font-family:var(--font-digits);font-size:.85rem;overflow-wrap:anywhere"></code>
-        <div class="field-row">
-          <label class="field grow"><span class="label">Client ID</span><input type="text" id="sp-client" autocomplete="off" spellcheck="false"></label>
-          <button class="btn spotify" id="sp-connect" type="button">Connecter Spotify</button>
+      <div class="field-row">
+        <div class="field">
+          <span class="label">Durée de la séance</span>
+          <span class="time"><input type="number" id="w-total-m" min="0" max="300" aria-label="minutes">′
+            <input type="number" id="w-total-s" min="0" max="59" aria-label="secondes">″</span>
         </div>
+        <label class="field">
+          <span class="label">Préparation (s)</span>
+          <input type="number" id="w-countdown" min="0" max="120">
+        </label>
       </div>
-      <div id="sp-ready" hidden class="section">
+      <p class="hint">Durée de la séance : facultatif. Elle tourne en continu en même temps que vos timers et sonne à 0. Laissez 0′ 0″ si vous n'en avez pas besoin.</p>
+      <label class="check"><input type="checkbox" id="w-waitfirst"> Attendre mon signal avant le premier timer</label>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2 class="card-title">Timers</h2>
+        <span class="card-note" id="timers-count"></span>
+      </div>
+      <div class="timers" id="blocks"></div>
+      <button class="add-btn" id="add-open" type="button" aria-expanded="false">+ Ajouter un timer</button>
+      <div class="kind-picker" id="kind-picker" hidden></div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">Enregistrer</h2>
+      <div class="actions">
+        <label class="field"><span class="label">Sur la touche</span>
+          <select id="save-slot">
+            <option value="">Aucune</option>
+            <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+          </select>
+        </label>
+        <button class="btn primary" id="save" type="button">Enregistrer la séance</button>
+      </div>
+      <p class="hint">Retrouvez-la ensuite dans l'onglet « Mes séances ». Même nom = la séance enregistrée est remplacée.</p>
+    </div>
+  </section>
+
+  <!-- Onglet 2 : séances enregistrées -->
+  <section class="panel" id="tab-saved" data-panel="saved" hidden>
+    <div class="card">
+      <h2 class="card-title">Touches rapides</h2>
+      <div class="keypad" id="keypad"></div>
+      <p class="hint">Touchez un chiffre pour lancer la séance. La croix ✕ vide la touche.</p>
+    </div>
+    <div class="card">
+      <h2 class="card-title">Toutes mes séances</h2>
+      <div id="saved-list"></div>
+    </div>
+  </section>
+
+  <!-- Onglet 3 : musique -->
+  <section class="panel" id="tab-music" data-panel="music" hidden>
+    <div class="card" id="sp-box">
+      <h2 class="card-title">Spotify</h2>
+      <div id="sp-embedded" hidden>
+        <p class="notice">Sur ce lien, le timer ne peut pas piloter Spotify : la page bloque les connexions vers d'autres sites. Ouvrez le timer à son adresse <b>bignovadigital.github.io/Coaching-Timer</b> pour connecter Spotify.</p>
+      </div>
+      <div id="sp-setup" hidden class="panel">
+        <p class="hint">Compte <b>Spotify Premium</b> requis. À faire une seule fois :</p>
+        <ol class="steps">
+          <li>Sur <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a>, créez une app.</li>
+          <li>Dans <b>Redirect URIs</b>, collez exactement cette adresse :</li>
+        </ol>
+        <div class="copybox"><code id="sp-redirect"></code><button class="icon-btn" id="sp-copy" type="button">Copier</button></div>
+        <ol class="steps" start="3">
+          <li>Cochez <b>Web API</b>, enregistrez, puis ouvrez <b>Settings</b> et copiez le <b>Client ID</b> (pas le « Client secret »).</li>
+        </ol>
+        <div class="field-row">
+          <label class="field grow"><span class="label">Client ID (32 caractères)</span><input type="text" id="sp-client" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+          <button class="btn spotify" id="sp-connect" type="button">Connecter</button>
+        </div>
+        <p class="error" id="sp-error" hidden></p>
+      </div>
+      <div id="sp-ready" hidden class="panel">
         <div class="now">
           <img id="sp-art" alt="" hidden>
           <div><b id="sp-track">Rien en lecture</b><span id="sp-artist">Ouvrez Spotify sur un appareil</span></div>
         </div>
         <div class="actions">
           <button class="icon-btn" id="sp-prev" type="button" aria-label="Morceau précédent">⏮</button>
-          <button class="icon-btn" id="sp-toggle" type="button">Lecture / Pause</button>
+          <button class="btn" id="sp-toggle" type="button">Lecture / Pause</button>
           <button class="icon-btn" id="sp-next" type="button" aria-label="Morceau suivant">⏭</button>
-          <label class="field" style="flex:1 1 160px"><span class="label">Volume Spotify</span><input type="range" id="sp-vol" min="0" max="100"></label>
         </div>
-        <label class="field full"><span class="label">Playlist à lancer au démarrage (lien Spotify, facultatif)</span>
-          <input type="text" id="sp-playlist" placeholder="https://open.spotify.com/playlist/…" spellcheck="false"></label>
+        <label class="field"><span class="label">Volume Spotify</span><input type="range" id="sp-vol" min="0" max="100"></label>
+        <label class="field full"><span class="label">Playlist à lancer au démarrage (facultatif)</span>
+          <input type="text" id="sp-playlist" placeholder="Lien de partage Spotify de la playlist" spellcheck="false"></label>
         <button class="icon-btn" id="sp-logout" type="button" style="align-self:start">Déconnecter Spotify</button>
       </div>
     </div>
-
-
-    <div class="section">
-      <span class="label">Pendant la séance</span>
-      <label class="check"><input type="checkbox" id="opt-duck" checked> Baisser la musique pendant les bips</label>
+    <div class="card">
+      <h2 class="card-title">Pendant la séance</h2>
       <label class="check"><input type="checkbox" id="opt-autoplay" checked> Lancer la musique au démarrage</label>
       <label class="check"><input type="checkbox" id="opt-pausemusic" checked> Mettre la musique en pause avec le timer</label>
+      <label class="check"><input type="checkbox" id="opt-duck" checked> Baisser la musique pendant les bips</label>
     </div>
   </section>
 
-  <section class="section" aria-labelledby="display-title">
-    <span class="label" id="display-title">Affichage et son</span>
-    <label class="check"><input type="checkbox" id="opt-led"> Chiffres LED rouges (style horloge de box)</label>
-    <label class="check"><input type="checkbox" id="opt-voice"> Annonces vocales (tour, repos, bloc suivant)</label>
-    <label class="check"><input type="checkbox" id="opt-24h" checked> Horloge en 24 h</label>
-  </section>
-
-  <details class="help">
-    <summary>Raccourcis clavier (comme la télécommande)</summary>
-    <div class="keys">
-      <kbd>Espace / Entrée</kbd><span>OK : démarrer, pause, reprendre</span>
-      <kbd>← →</kbd><span>Étape précédente / suivante</span>
-      <kbd>R</kbd><span>Reset : relancer l'étape en cours (chrono : remise à 0)</span>
-      <kbd>Échap</kbd><span>Exit : quitter l'écran</span>
-      <kbd>1 … 5</kbd><span>Lancer la séance enregistrée sur cette touche</span>
-      <kbd>T</kbd><span>Tabata (TBT)</span>
-      <kbd>F</kbd><span>Fight Gone Bad (FGB)</span>
-      <kbd>S</kbd><span>Chronomètre</span>
-      <kbd>C</kbd><span>Horloge</span>
-      <kbd>M</kbd><span>Son oui / non</span>
-      <kbd>B</kbd><span>Luminosité (5 niveaux)</span>
-      <kbd>+ −</kbd><span>Volume des bips</span>
-      <kbd>P</kbd><span>Préparation 10 s activée / désactivée</span>
+  <!-- Onglet 4 : réglages -->
+  <section class="panel" id="tab-settings" data-panel="settings" hidden>
+    <div class="card">
+      <h2 class="card-title">Affichage et son</h2>
+      <label class="check"><input type="checkbox" id="opt-led"> Chiffres LED rouges (style horloge de box)</label>
+      <label class="check"><input type="checkbox" id="opt-voice"> Annonces vocales (tour, repos, bloc suivant)</label>
+      <label class="check"><input type="checkbox" id="opt-24h" checked> Horloge en 24 h</label>
     </div>
-    <p class="hint" style="margin-top:10px">Une télécommande Bluetooth de présentation (qui envoie les flèches et Entrée) peut piloter le timer.</p>
-  </details>
+    <div class="card">
+      <h2 class="card-title">Raccourcis clavier</h2>
+      <div class="keys">
+        <kbd>Espace / Entrée</kbd><span>Pause, reprendre</span>
+        <kbd>← →</kbd><span>Étape précédente / suivante</span>
+        <kbd>R</kbd><span>Relancer l'étape en cours</span>
+        <kbd>Échap</kbd><span>Quitter l'écran</span>
+        <kbd>1 … 5</kbd><span>Lancer la séance de la touche</span>
+        <kbd>S / C</kbd><span>Chronomètre / Horloge</span>
+        <kbd>M</kbd><span>Son oui / non</span>
+        <kbd>B</kbd><span>Luminosité</span>
+        <kbd>+ −</kbd><span>Volume des bips</span>
+        <kbd>P</kbd><span>Préparation activée / désactivée</span>
+      </div>
+      <p class="hint">Une télécommande Bluetooth de présentation (flèches et Entrée) peut piloter le timer.</p>
+    </div>
+  </section>
 </main>
 
 <div class="startbar" id="startbar">
@@ -440,6 +481,19 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     <button class="go" id="go" type="button">Démarrer</button>
   </div>
 </div>
+
+<nav class="tabbar" id="tabbar" aria-label="Sections">
+  <div class="inner" role="tablist">
+    <button class="tab" role="tab" data-tab="seance" aria-selected="true" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>Séance</button>
+    <button class="tab" role="tab" data-tab="saved" aria-selected="false" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Mes séances</button>
+    <button class="tab" role="tab" data-tab="music" aria-selected="false" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Musique</button>
+    <button class="tab" role="tab" data-tab="settings" aria-selected="false" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Réglages</button>
+  </div>
+</nav>
 
 <!-- Écran de séance -->
 <section class="screen" id="run" hidden data-phase="prep" aria-live="polite">
@@ -540,43 +594,16 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   // Valeurs de départ seulement : tout se modifie dans l'éditeur
   const block = (kind, extra = {}) => ({ kind, name: "", reps: 10, restAfter: 0, waitAfter: false, ...KINDS[kind].defaults, ...extra });
 
-  const TEMPLATES = {
-    example: { label: "Exemple 5 blocs (7×5′)", make: () => ({
-      name: "5 blocs · 7×5′", countdown: 10,
-      blocks: [0,1,2,3,4].map(() => block("interval", { rounds: 7, work: 300, rest: 0, restAfter: 60 })) }) },
-    session: { label: "Séance complète (échauffement + Tabata + séries)", make: () => ({
-      name: "Séance complète", countdown: 10,
-      blocks: [
-        block("countdown", { name: "Échauffement", work: 300, waitAfter: true }),
-        block("tabata", { name: "Tabata", rounds: 8, work: 30, rest: 10, waitAfter: true }),
-        block("reps", { rounds: 3, reps: 10, rest: 90 }),
-      ] }) },
-    reps: { label: "3 séries × 10 reps", make: () => ({ name: "3 × 10", countdown: 10, blocks: [block("reps")] }) },
-    interval: { label: "Intervalles", make: () => ({ name: "Intervalles", countdown: 10, blocks: [block("interval")] }) },
-    tabata: { label: "Tabata", make: () => ({ name: "Tabata", countdown: 10, blocks: [block("tabata", { restAfter: 0 })] }) },
-    fgb: { label: "Fight Gone Bad", make: () => ({
-      name: "Fight Gone Bad", countdown: 10,
-      blocks: [1,2,3].map((n) => block("interval", { name: `Round ${n}`, rounds: 5, work: 60, rest: 0, restAfter: 60 })) }) },
-    amrap: { label: "AMRAP 12′", make: () => ({ name: "AMRAP 12′", countdown: 10, blocks: [block("amrap", { restAfter: 0 })] }) },
-    emom: { label: "EMOM 10′", make: () => ({ name: "EMOM 10′", countdown: 10, blocks: [block("emom", { restAfter: 0 })] }) },
-    fortime: { label: "For Time (cap 20′)", make: () => ({ name: "For Time", countdown: 10, blocks: [block("fortime", { restAfter: 0 })] }) },
-    countdown: { label: "Minuteur 10′", make: () => ({ name: "Minuteur", countdown: 10, blocks: [block("countdown", { restAfter: 0 })] }) },
-    countup: { label: "Chrono montant 20′", make: () => ({ name: "Chrono montant", countdown: 10, blocks: [block("countdown", { work: 1200, up: true, restAfter: 0 })] }) },
-    amrap3: { label: "3 × AMRAP 4′", make: () => ({
-      name: "3 × AMRAP 4′", countdown: 10, blocks: [0,1,2].map(() => block("amrap", { work: 240, restAfter: 60 })) }) },
+  const KIND_DESC = {
+    countdown: "Un temps unique, ex. 5′ d'échauffement",
+    interval: "Tours de travail / repos",
+    tabata: "Tours ON / OFF, ex. 8 × 30″ / 10″",
+    reps: "Séries de répétitions, repos entre séries",
+    amrap: "Max de tours en un temps donné",
+    emom: "Une tâche au début de chaque minute",
+    fortime: "Chrono qui monte jusqu'au time cap",
   };
-
-  // Touches de mode (inspirées de la télécommande Echo)
-  const MODES = [
-    { key: "▼", label: "Minuteur", desc: "Ex. 5′ d'échauffement", run: () => loadTemplate("countdown") },
-    { key: "INT", label: "Intervalles", desc: "Travail / repos au choix", run: () => loadTemplate("interval") },
-    { key: "TBT", label: "Tabata", desc: "Tours, ON, OFF au choix", run: () => loadTemplate("tabata") },
-    { key: "×", label: "Séries / reps", desc: "Ex. 3 × 10, repos", run: () => loadTemplate("reps") },
-    { key: "FGB", label: "Fight Gone Bad", desc: "Rounds et minutes au choix", run: () => loadTemplate("fgb") },
-    { key: "▲", label: "Chrono montant", desc: "De 0 au time cap", run: () => loadTemplate("countup") },
-    { key: "⏱", label: "Chronomètre", desc: "Start / stop / reset", run: () => openStopwatch() },
-    { key: "CLOCK", label: "Horloge", desc: "Heure 12 / 24 h", run: () => openClock() },
-  ];
+  const KIND_ORDER = ["countdown", "interval", "tabata", "reps", "amrap", "emom", "fortime"];
 
   const emptyWorkout = () => ({ name: "", countdown: 10, total: 0, waitFirst: false, blocks: [] });
   let workout = store.get(K.draft, null) || emptyWorkout();
@@ -632,12 +659,22 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   const finiteSum = (segs) => segs.reduce((a, s) => a + (Number.isFinite(s.dur) ? s.dur : 0), 0);
   const totalOf = (w) => finiteSum(buildSegments(w));
   const hasOpen = (w) => w.blocks.some((b, i) => b.kind === "reps" || (b.waitAfter && i < w.blocks.length - 1));
+  const workoutLength = (w) => w.total ? fmt(w.total) : fmt(totalOf(w)) + (hasOpen(w) ? " +" : "");
 
-  // ---------- Accueil : modes et touches ----------
-  $("modes").innerHTML = MODES.map((m, i) =>
-    `<button class="mode" type="button" data-mode="${i}"><span class="key">${m.key}</span>${m.label}<small>${m.desc}</small></button>`).join("");
-  $("modes").addEventListener("click", (e) => { const b = e.target.closest("[data-mode]"); if (b) MODES[+b.dataset.mode].run(); });
+  // ---------- Onglets ----------
+  function showTab(name) {
+    $$("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== name));
+    $$("[data-tab]").forEach((t) => t.setAttribute("aria-selected", String(t.dataset.tab === name)));
+    $("startbar").hidden = name !== "seance";
+    $("editor").classList.toggle("no-startbar", name !== "seance");
+    try { sessionStorage.setItem("coaching-timer:tab", name); } catch {}
+    window.scrollTo({ top: 0 });
+  }
+  $("tabbar").addEventListener("click", (e) => { const t = e.target.closest("[data-tab]"); if (t) showTab(t.dataset.tab); });
+  $("open-sw").addEventListener("click", () => openStopwatch());
+  $("open-ck").addEventListener("click", () => openClock());
 
+  // ---------- Touches 1–5 ----------
   const SLOTS = [1, 2, 3, 4, 5];
   function renderKeypad() {
     const list = store.get(K.saved, []);
@@ -674,23 +711,52 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   function launchSlot(n) {
     const w = store.get(K.saved, []).find((x) => String(x.slot) === String(n));
     if (!w) { toast(`Aucune séance sur la touche ${n}`); return; }
-    workout = normalize(JSON.parse(JSON.stringify(w))); renderEditor(); start();
-  }
-
-  function loadTemplate(key) {
-    workout = TEMPLATES[key].make(); renderEditor();
-    $("build-title").scrollIntoView({ behavior: "smooth", block: "start" });
-    toast(`${TEMPLATES[key].label} : réglez les chiffres puis Démarrer`);
+    workout = normalize(JSON.parse(JSON.stringify(w))); $("save-slot").value = w.slot ?? ""; renderEditor(); start();
   }
 
   // ---------- Éditeur ----------
+  let openIdx = -1; // timer déplié pour modification
   function timeInputs(id, secs) {
     return `<span class="time"><input type="number" id="${id}-m" min="0" max="180" value="${Math.floor(secs / 60)}" aria-label="minutes">′
       <input type="number" id="${id}-s" min="0" max="59" value="${secs % 60}" aria-label="secondes">″</span>`;
   }
-  const sumText = (b) => b.kind === "reps"
-    ? `${b.rounds} × ${b.reps} reps${b.rest ? ` · repos ${fmt(b.rest)} entre séries` : ""} · à votre rythme`
-    : `${b.rounds} × ${fmt(b.work)}${b.rest ? ` / repos ${fmt(b.rest)}` : ""} = ${fmt(blockTotal(b))}`;
+  function sumText(b) {
+    if (b.kind === "reps") return `${b.rounds} × ${b.reps} reps${b.rest ? ` · repos ${fmt(b.rest)}` : ""}`;
+    if (b.rounds === 1 && !b.rest) return `${fmt(b.work)}${b.up ? " · montant" : ""}`;
+    return `${b.rounds} × ${fmt(b.work)}${b.rest ? ` / ${fmt(b.rest)}` : ""} = ${fmt(blockTotal(b))}`;
+  }
+  const betweenText = (b) => [b.restAfter ? `Repos ${fmt(b.restAfter)}` : "", b.waitAfter ? "J'attends votre signal" : ""].filter(Boolean).join(" · ");
+
+  function editFields(b, i, last) {
+    const workLabel = b.kind === "fortime" ? "Time cap" : b.kind === "amrap" || b.kind === "countdown" ? "Durée" : "Travail (ON)";
+    return `<div class="timer-edit">
+      <div class="field-row">
+        <label class="field"><span class="label">Type</span>
+          <select id="b${i}-kind" data-k="kind">${KIND_ORDER.map((k) => `<option value="${k}" ${k === b.kind ? "selected" : ""}>${KINDS[k].label}</option>`).join("")}</select></label>
+        <label class="field grow"><span class="label">Nom (facultatif)</span>
+          <input type="text" id="b${i}-name" data-k="name" value="${esc(b.name)}" placeholder="Bloc ${LETTERS[i] || i + 1}" maxlength="40"></label>
+      </div>
+      <div class="field-row">
+        <label class="field"><span class="label">${b.kind === "reps" ? "Séries" : "Tours"}</span>
+          <input type="number" id="b${i}-rounds" data-k="rounds" min="1" max="99" value="${b.rounds}"></label>
+        ${b.kind === "reps"
+          ? `<label class="field"><span class="label">Répétitions</span><input type="number" id="b${i}-reps" data-k="reps" min="1" max="999" value="${b.reps}"></label>`
+          : `<div class="field"><span class="label">${workLabel}</span>${timeInputs(`b${i}-work`, b.work)}</div>`}
+        <div class="field"><span class="label">${b.kind === "reps" ? "Repos entre séries" : "Repos (OFF)"}</span>${timeInputs(`b${i}-rest`, b.rest)}</div>
+      </div>
+      ${b.kind === "reps" ? "" : `<label class="check"><input type="checkbox" id="b${i}-up" data-k="up" ${b.up ? "checked" : ""}> Chrono montant (de 0 vers le temps)</label>`}
+      ${i < last ? `<div class="field-row">
+          <div class="field"><span class="label">Repos avant le timer suivant</span>${timeInputs(`b${i}-after`, b.restAfter)}</div>
+        </div>
+        <label class="check"><input type="checkbox" id="b${i}-wait" data-k="waitAfter" ${b.waitAfter ? "checked" : ""}> Attendre mon signal avant le timer suivant</label>` : ""}
+      <div class="timer-tools">
+        <button class="icon-btn" data-act="up" type="button" ${i === 0 ? "disabled" : ""}>↑ Monter</button>
+        <button class="icon-btn" data-act="down" type="button" ${i === last ? "disabled" : ""}>↓ Descendre</button>
+        <button class="icon-btn" data-act="dup" type="button">Dupliquer</button>
+        <button class="icon-btn danger" data-act="del" type="button">Supprimer</button>
+      </div>
+    </div>`;
+  }
 
   function renderEditor() {
     $("w-name").value = workout.name;
@@ -698,56 +764,40 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     $("w-total-m").value = Math.floor(workout.total / 60);
     $("w-total-s").value = workout.total % 60;
     $("w-waitfirst").checked = workout.waitFirst;
-    const last = workout.blocks.length - 1;
-    $("apply-all").hidden = workout.blocks.length < 2;
-    $("clear").hidden = $("zero").hidden = !workout.blocks.length;
-    $("go").disabled = !workout.blocks.length;
-    if (!workout.blocks.length) {
-      $("blocks").innerHTML = `<p class="empty">Aucun timer pour l'instant. Touchez un mode en haut, ou ajoutez un timer juste en dessous.</p>`;
-      renderTotal(); return;
-    }
-    $("blocks").innerHTML = workout.blocks.map((b, i) => `
-      <article class="block" data-i="${i}">
-        <div class="block-head">
-          <div class="block-letter">${LETTERS[i] || i + 1}</div>
-          <input type="text" id="b${i}-name" data-k="name" value="${esc(b.name)}" placeholder="Bloc ${LETTERS[i] || i + 1} (nom)" maxlength="40">
-          <select id="b${i}-kind" data-k="kind" aria-label="Type de bloc">
-            ${Object.entries(KINDS).map(([k, v]) => `<option value="${k}" ${k === b.kind ? "selected" : ""}>${v.label}</option>`).join("")}
-          </select>
-          <div class="block-tools">
-            <button class="icon-btn" data-act="up" type="button" aria-label="Monter" ${i === 0 ? "disabled" : ""}>↑</button>
-            <button class="icon-btn" data-act="dup" type="button">Dupliquer</button>
-            <button class="icon-btn" data-act="del" type="button">Suppr.</button>
-          </div>
-        </div>
-        <div class="field-row">
-          <label class="field"><span class="label">${b.kind === "reps" ? "Séries" : "Tours"}</span>
-            <input type="number" id="b${i}-rounds" data-k="rounds" min="1" max="99" value="${b.rounds}"></label>
-          ${b.kind === "reps"
-            ? `<label class="field"><span class="label">Répétitions</span><input type="number" id="b${i}-reps" data-k="reps" min="1" max="999" value="${b.reps}"></label>`
-            : `<div class="field"><span class="label">${b.kind === "fortime" ? "Time cap" : b.kind === "amrap" || b.kind === "countdown" ? "Durée" : "Travail (ON)"}</span>${timeInputs(`b${i}-work`, b.work)}</div>`}
-          <div class="field"><span class="label">${b.kind === "reps" ? "Repos entre séries" : "Repos entre tours (OFF)"}</span>${timeInputs(`b${i}-rest`, b.rest)}</div>
-          ${i < last ? `<div class="field"><span class="label">Repos après le bloc</span>${timeInputs(`b${i}-after`, b.restAfter)}</div>` : ""}
-        </div>
-        ${b.kind === "reps" ? "" : `<label class="check"><input type="checkbox" id="b${i}-up" data-k="up" ${b.up ? "checked" : ""}> Chrono montant (de 0 vers le temps)</label>`}
-        ${i < last ? `<label class="check"><input type="checkbox" id="b${i}-wait" data-k="waitAfter" ${b.waitAfter ? "checked" : ""}> Attendre mon signal avant le bloc suivant</label>` : ""}
-        <div class="block-sum">${sumText(b)}</div>
-      </article>`).join("");
+    const n = workout.blocks.length, last = n - 1;
+    if (openIdx >= n) openIdx = -1;
+    $("zero").hidden = !n && !workout.total && !workout.name;
+    $("go").disabled = !n;
+    $("timers-count").textContent = n ? `${n} timer${n > 1 ? "s" : ""}` : "";
+    $("blocks").innerHTML = !n
+      ? `<p class="empty">Aucun timer. Touchez « + Ajouter un timer » pour commencer.</p>`
+      : workout.blocks.map((b, i) => `
+        <article class="timer ${i === openIdx ? "open" : ""}" data-i="${i}">
+          <button class="timer-row" type="button" data-toggle aria-expanded="${i === openIdx}">
+            <span class="timer-letter">${LETTERS[i] || i + 1}</span>
+            <span class="timer-main"><b>${esc(b.name.trim() || KINDS[b.kind].label)}</b><span class="timer-sum">${b.name.trim() ? `${KINDS[b.kind].label} · ` : ""}${sumText(b)}</span></span>
+            <span class="timer-chev">${i === openIdx ? "Fermer ▴" : "Modifier ▾"}</span>
+          </button>
+          ${i === openIdx ? editFields(b, i, last) : ""}
+        </article>
+        ${i < last && betweenText(b) ? `<div class="between">${betweenText(b)}</div>` : ""}`).join("");
     renderTotal();
   }
 
   function renderTotal() {
-    $("total").textContent = workout.total ? fmt(workout.total) : fmt(totalOf(workout)) + (hasOpen(workout) ? " +" : "");
+    $("total").textContent = workoutLength(workout);
+    // Met à jour le résumé du timer ouvert sans redessiner les champs (le clavier reste ouvert)
     workout.blocks.forEach((b, i) => {
-      const el = document.querySelector(`.block[data-i="${i}"] .block-sum`);
-      if (el) el.textContent = sumText(b);
+      const el = document.querySelector(`.timer[data-i="${i}"] .timer-sum`);
+      if (el) el.textContent = `${b.name.trim() ? `${KINDS[b.kind].label} · ` : ""}${sumText(b)}`;
     });
+    $("zero").hidden = !workout.blocks.length && !workout.total && !workout.name;
     store.set(K.draft, workout);
   }
   const readTime = (p) => clampInt($(`${p}-m`)?.value, 0, 180) * 60 + clampInt($(`${p}-s`)?.value, 0, 59);
 
   $("blocks").addEventListener("input", (e) => {
-    const art = e.target.closest(".block"); if (!art) return;
+    const art = e.target.closest(".timer"); if (!art) return;
     const i = +art.dataset.i, b = workout.blocks[i], k = e.target.dataset.k;
     if (k === "name") b.name = e.target.value;
     else if (k === "rounds") b.rounds = clampInt(e.target.value, 1, 99);
@@ -763,17 +813,22 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     renderTotal();
   });
   $("blocks").addEventListener("change", (e) => {
-    if (e.target.dataset.k !== "kind") return;
-    const i = +e.target.closest(".block").dataset.i, old = workout.blocks[i];
-    workout.blocks[i] = block(e.target.value, { name: old.name, restAfter: old.restAfter, waitAfter: old.waitAfter });
-    renderEditor();
+    const k = e.target.dataset.k;
+    if (k === "kind") {
+      const i = +e.target.closest(".timer").dataset.i, old = workout.blocks[i];
+      workout.blocks[i] = block(e.target.value, { name: old.name, restAfter: old.restAfter, waitAfter: old.waitAfter });
+      renderEditor();
+    } else if (k === "name" || k === "waitAfter") renderEditor();
   });
   $("blocks").addEventListener("click", (e) => {
-    const act = e.target.dataset.act; if (!act) return;
-    const i = +e.target.closest(".block").dataset.i;
-    if (act === "del") workout.blocks.splice(i, 1);
-    if (act === "dup") workout.blocks.splice(i + 1, 0, { ...workout.blocks[i], name: "" });
-    if (act === "up" && i > 0) [workout.blocks[i - 1], workout.blocks[i]] = [workout.blocks[i], workout.blocks[i - 1]];
+    const art = e.target.closest(".timer"); if (!art) return;
+    const i = +art.dataset.i;
+    if (e.target.closest("[data-toggle]")) { openIdx = openIdx === i ? -1 : i; renderEditor(); return; }
+    const act = e.target.closest("[data-act]")?.dataset.act; if (!act) return;
+    if (act === "del") { workout.blocks.splice(i, 1); openIdx = -1; }
+    if (act === "dup") { workout.blocks.splice(i + 1, 0, { ...workout.blocks[i], name: "" }); openIdx = i + 1; }
+    if (act === "up" && i > 0) { [workout.blocks[i - 1], workout.blocks[i]] = [workout.blocks[i], workout.blocks[i - 1]]; openIdx = i - 1; }
+    if (act === "down" && i < workout.blocks.length - 1) { [workout.blocks[i + 1], workout.blocks[i]] = [workout.blocks[i], workout.blocks[i + 1]]; openIdx = i + 1; }
     renderEditor();
   });
   $("w-name").addEventListener("input", (e) => { workout.name = e.target.value; renderTotal(); });
@@ -782,38 +837,42 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   $("w-total-m").addEventListener("input", readTotal);
   $("w-total-s").addEventListener("input", readTotal);
   $("w-waitfirst").addEventListener("change", (e) => { workout.waitFirst = e.target.checked; renderTotal(); });
-  $("add-kinds").innerHTML = Object.entries(KINDS).map(([k, v]) => `<button class="chip" type="button" data-add="${k}">+ ${v.label}</button>`).join("");
-  $("add-kinds").addEventListener("click", (e) => {
-    const k = e.target.dataset.add; if (!k) return;
-    workout.blocks.push(block(k)); renderEditor();
-    document.querySelector(`.block[data-i="${workout.blocks.length - 1}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+
+  // Ajouter un timer : on choisit le type, il s'ajoute à la fin et s'ouvre
+  $("kind-picker").innerHTML = KIND_ORDER.map((k) =>
+    `<button class="kind" type="button" data-add="${k}"><b>${KINDS[k].label}</b><small>${KIND_DESC[k]}</small></button>`).join("");
+  $("add-open").addEventListener("click", () => {
+    const open = $("kind-picker").hidden;
+    $("kind-picker").hidden = !open;
+    $("add-open").setAttribute("aria-expanded", String(open));
+    $("add-open").textContent = open ? "Choisissez le type de timer" : "+ Ajouter un timer";
   });
+  $("kind-picker").addEventListener("click", (e) => {
+    const k = e.target.closest("[data-add]")?.dataset.add; if (!k) return;
+    workout.blocks.push(block(k)); openIdx = workout.blocks.length - 1;
+    $("kind-picker").hidden = true; $("add-open").textContent = "+ Ajouter un timer"; $("add-open").setAttribute("aria-expanded", "false");
+    renderEditor();
+    document.querySelector(`.timer[data-i="${openIdx}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+
   // Remise à zéro de la séance en cours (les touches 1–5 enregistrées ne sont pas touchées)
-  function armedReset() {
-    workout = emptyWorkout(); $("save-slot").value = ""; renderEditor(); toast("Séance remise à zéro");
-  }
-  $("clear").addEventListener("click", armedReset);
-  $("zero").addEventListener("click", armedReset);
-  $("apply-all").addEventListener("click", () => {
-    const a = workout.blocks[0];
-    workout.blocks = workout.blocks.map((b) => ({ ...a, name: b.name }));
-    renderEditor(); toast("Réglages du bloc A copiés sur tous les blocs");
+  $("zero").addEventListener("click", () => {
+    workout = emptyWorkout(); openIdx = -1; $("save-slot").value = ""; renderEditor(); toast("Séance remise à zéro");
   });
-  $("templates").innerHTML = Object.entries(TEMPLATES).map(([k, t]) => `<button class="chip" type="button" data-t="${k}">${t.label}</button>`).join("");
-  $("templates").addEventListener("click", (e) => { const t = e.target.dataset.t; if (t) { workout = TEMPLATES[t].make(); renderEditor(); } });
 
   // ---------- Séances enregistrées ----------
   function renderSaved() {
     const list = store.get(K.saved, []);
     $("saved-list").innerHTML = list.length
       ? list.map((w, i) => `<div class="saved-item">
-          <span class="slotno">${SLOTS.includes(w.slot) ? w.slot : "–"}</span>
-          <button class="load" data-load="${i}" type="button">${esc(w.name || "Sans nom")} <small>· ${w.blocks.length} bloc(s) · ${fmt(totalOf(w))}${hasOpen(w) ? " +" : ""}</small></button>
-          <button class="icon-btn" data-delsaved="${i}" type="button">Supprimer</button></div>`).join("")
-      : `<p class="empty">Aucune séance enregistrée.</p>`;
+          <span class="slotno ${SLOTS.includes(w.slot) ? "on" : ""}" title="Touche">${SLOTS.includes(w.slot) ? w.slot : "–"}</span>
+          <button class="load" data-load="${i}" type="button"><b>${esc(w.name || "Sans nom")}</b><small>${w.blocks.length} timer(s) · ${workoutLength(normalize(w))} · touchez pour modifier</small></button>
+          <button class="icon-btn danger" data-delsaved="${i}" type="button">Supprimer</button></div>`).join("")
+      : `<p class="empty">Aucune séance enregistrée. Construisez une séance dans l'onglet « Séance », puis « Enregistrer la séance ».</p>`;
     renderKeypad();
   }
   $("save").addEventListener("click", () => {
+    if (!workout.blocks.length) { toast("Ajoutez au moins un timer avant d'enregistrer"); return; }
     const list = store.get(K.saved, []);
     const name = workout.name.trim() || "Sans nom";
     const slot = $("save-slot").value === "" ? null : +$("save-slot").value;
@@ -829,8 +888,8 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     const l = e.target.closest("[data-load]"), d = e.target.closest("[data-delsaved]");
     if (l) {
       const w = list[+l.dataset.load];
-      workout = normalize(JSON.parse(JSON.stringify(w))); $("save-slot").value = w.slot ?? "";
-      renderEditor(); $("build-title").scrollIntoView({ behavior: "smooth" });
+      workout = normalize(JSON.parse(JSON.stringify(w))); $("save-slot").value = w.slot ?? ""; openIdx = -1;
+      renderEditor(); showTab("seance"); toast(`« ${w.name} » ouverte`);
     }
     if (d) {
       if (d.dataset.armed) { list.splice(+d.dataset.delsaved, 1); store.set(K.saved, list); renderSaved(); }
@@ -910,15 +969,24 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   // Fonctionne uniquement quand l'app est ouverte à sa propre adresse (pas dans une page intégrée),
   // avec un compte Premium et un Client ID déclaré sur developer.spotify.com.
   const embedded = (() => { try { return window.self !== window.top; } catch { return true; } })();
-  const REDIRECT = location.origin + location.pathname;
+  // Adresse de retour normalisée : …/Coaching-Timer/ (sans « index.html »), identique à celle à déclarer chez Spotify
+  const REDIRECT = location.origin + location.pathname.replace(/index\.html$/, "");
   const sp = Object.assign({ clientId: "", access: "", refresh: "", expires: 0 }, store.get(K.sp, {}));
   const saveSp = () => store.set(K.sp, sp);
   let spState = null; // dernier état du lecteur
 
   const b64url = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   async function spConnect() {
-    sp.clientId = $("sp-client").value.trim();
-    if (!sp.clientId) { toast("Collez d'abord votre Client ID Spotify"); return; }
+    // Retire espaces et retours à la ligne souvent collés avec l'identifiant
+    const id = $("sp-client").value.replace(/\s+/g, "");
+    $("sp-client").value = id;
+    const err = (msg) => { $("sp-error").textContent = msg; $("sp-error").hidden = false; };
+    $("sp-error").hidden = true;
+    if (!id) return err("Collez d'abord votre Client ID Spotify.");
+    if (!/^[0-9a-f]{32}$/i.test(id)) {
+      return err(`Ce Client ID a ${id.length} caractère(s) : il en faut 32 (chiffres et lettres a à f). Vérifiez que vous avez copié le « Client ID » en entier, et pas le « Client secret ».`);
+    }
+    sp.clientId = id;
     const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
     const challenge = b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
     try { sessionStorage.setItem("sp-verifier", verifier); } catch {}
@@ -945,10 +1013,15 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     const p = new URLSearchParams(location.search);
     if (!p.has("code") && !p.has("error")) return;
     history.replaceState(null, "", REDIRECT);
-    if (p.has("error")) { toast(`Spotify : ${p.get("error")}`); return; }
+    showTab("music");
+    if (p.has("error")) {
+      const e = p.get("error");
+      $("sp-error").textContent = e === "access_denied" ? "Connexion refusée dans Spotify." : `Spotify a répondu : ${e}`;
+      $("sp-error").hidden = false; return;
+    }
     let verifier = null; try { verifier = sessionStorage.getItem("sp-verifier"); } catch {}
     try { await spToken({ grant_type: "authorization_code", code: p.get("code"), redirect_uri: REDIRECT, code_verifier: verifier }); toast("Spotify connecté"); }
-    catch (err) { toast(`Spotify : ${err.message}`); }
+    catch (err) { $("sp-error").textContent = `Spotify a répondu : ${err.message}`; $("sp-error").hidden = false; }
   }
   async function spApi(path, opts = {}) {
     if (!sp.access) return null;
@@ -1008,6 +1081,10 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     if (sp.access) spRefreshState();
   }
   $("sp-connect").addEventListener("click", spConnect);
+  $("sp-copy").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(REDIRECT); toast("Adresse copiée"); }
+    catch { const r = document.createRange(); r.selectNodeContents($("sp-redirect")); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast("Adresse sélectionnée : copiez-la"); }
+  });
   $("sp-logout").addEventListener("click", spLogout);
   $("sp-toggle").addEventListener("click", () => (spState?.is_playing ? spPause() : spPlay()));
   $("sp-next").addEventListener("click", async () => { await spApi("/me/player/next", { method: "POST" }); setTimeout(spRefreshState, 800); });
@@ -1079,7 +1156,8 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   document.addEventListener("visibilitychange", () => { if (!document.hidden && currentScreen()) keepAwake(); });
   function show(id) {
     ["run", "sw", "ck"].forEach((s) => ($(s).hidden = s !== id));
-    $("editor").hidden = $("startbar").hidden = !!id;
+    $("editor").hidden = $("tabbar").hidden = !!id;
+    $("startbar").hidden = !!id || $("tab-seance").hidden;
     if (id) keepAwake();
     else {
       try { wakeLock?.release(); } catch {} wakeLock = null;
@@ -1349,14 +1427,14 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
       return;
     }
     if (/^[1-5]$/.test(k)) { if (scr) exitScreen(); launchSlot(k); return; }
-    if (k === "t" || k === "T") { if (scr) exitScreen(); loadTemplate("tabata"); }
-    else if (k === "f" || k === "F") { if (scr) exitScreen(); loadTemplate("fgb"); }
-    else if (k === "s" || k === "S") { if (scr) exitScreen(); openStopwatch(); }
+    if (k === "s" || k === "S") { if (scr) exitScreen(); openStopwatch(); }
     else if (k === "c" || k === "C") { if (scr) exitScreen(); openClock(); }
     else if (!scr && k === "Enter" && e.target === document.body) start();
   });
 
   // ---------- Démarrage ----------
+  let startTab = "seance"; try { startTab = sessionStorage.getItem("coaching-timer:tab") || "seance"; } catch {}
+  showTab(["seance", "saved", "music", "settings"].includes(startTab) ? startTab : "seance");
   applyPrefs();
   renderEditor();
   renderSaved();
