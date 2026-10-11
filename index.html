@@ -310,7 +310,8 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   <section class="blocks" id="blocks" aria-label="Blocs"></section>
 
   <div class="actions">
-    <button class="btn" id="add-block" type="button">+ Ajouter un bloc</button>
+    <span class="label" style="flex-basis:100%">Ajouter un timer à la suite</span>
+    <div class="templates" id="add-kinds"></div>
     <button class="btn" id="apply-all" type="button">Copier le bloc A sur tous</button>
   </div>
 
@@ -510,14 +511,24 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     emom:     { label: "EMOM",        defaults: { rounds: 10, work: 60, rest: 0, up: false } },
     tabata:   { label: "Tabata",      defaults: { rounds: 8, work: 20, rest: 10, up: false } },
     fortime:  { label: "For Time",    defaults: { rounds: 1, work: 1200, rest: 0, up: true } },
-    countdown:{ label: "Minuteur",    defaults: { rounds: 1, work: 600, rest: 0, up: false } },
+    countdown:{ label: "Minuteur",    defaults: { rounds: 1, work: 300, rest: 0, up: false } },
+    reps:     { label: "Séries / reps", defaults: { rounds: 3, reps: 10, work: 0, rest: 90, up: true } },
   };
-  const block = (kind, extra = {}) => ({ kind, name: "", moves: "", restAfter: 60, ...KINDS[kind].defaults, ...extra });
+  // Valeurs de départ seulement : tout se modifie dans l'éditeur
+  const block = (kind, extra = {}) => ({ kind, name: "", moves: "", reps: 10, restAfter: 0, waitAfter: false, ...KINDS[kind].defaults, ...extra });
 
   const TEMPLATES = {
     example: { label: "Exemple 5 blocs (7×5′)", make: () => ({
       name: "5 blocs · 7×5′", countdown: 10,
       blocks: [0,1,2,3,4].map(() => block("interval", { rounds: 7, work: 300, rest: 0, restAfter: 60 })) }) },
+    session: { label: "Séance complète (échauffement + Tabata + séries)", make: () => ({
+      name: "Séance complète", countdown: 10,
+      blocks: [
+        block("countdown", { name: "Échauffement", work: 300, waitAfter: true }),
+        block("tabata", { name: "Tabata", rounds: 8, work: 30, rest: 10, waitAfter: true }),
+        block("reps", { name: "Force", rounds: 3, reps: 10, rest: 90, moves: "Front squat" }),
+      ] }) },
+    reps: { label: "3 séries × 10 reps", make: () => ({ name: "3 × 10", countdown: 10, blocks: [block("reps")] }) },
     tabata: { label: "Tabata", make: () => ({ name: "Tabata", countdown: 10, blocks: [block("tabata", { restAfter: 0 })] }) },
     fgb: { label: "Fight Gone Bad", make: () => ({
       name: "Fight Gone Bad", countdown: 10,
@@ -534,11 +545,12 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
 
   // Touches de mode (inspirées de la télécommande Echo)
   const MODES = [
-    { key: "INT", label: "Intervalles", desc: "Tours, travail, repos", run: () => loadTemplate("example") },
-    { key: "TBT", label: "Tabata", desc: "8 × 20″ / 10″", run: () => quickStart("tabata") },
-    { key: "FGB", label: "Fight Gone Bad", desc: "3 × 5 stations de 1′", run: () => quickStart("fgb") },
-    { key: "▲", label: "Chrono montant", desc: "Compte de 0 au cap", run: () => loadTemplate("countup") },
-    { key: "▼", label: "Minuteur", desc: "Compte à rebours", run: () => loadTemplate("countdown") },
+    { key: "▼", label: "Minuteur", desc: "Ex. 5′ d'échauffement", run: () => loadTemplate("countdown") },
+    { key: "INT", label: "Intervalles", desc: "Travail / repos au choix", run: () => loadTemplate("example") },
+    { key: "TBT", label: "Tabata", desc: "Tours, ON, OFF au choix", run: () => loadTemplate("tabata") },
+    { key: "×", label: "Séries / reps", desc: "Ex. 3 × 10, repos", run: () => loadTemplate("reps") },
+    { key: "FGB", label: "Fight Gone Bad", desc: "Stations au choix", run: () => loadTemplate("fgb") },
+    { key: "▲", label: "Chrono montant", desc: "De 0 au time cap", run: () => loadTemplate("countup") },
     { key: "⏱", label: "Chronomètre", desc: "Start / stop / reset", run: () => openStopwatch() },
     { key: "CLOCK", label: "Horloge", desc: "Heure 12 / 24 h", run: () => openClock() },
   ];
@@ -546,7 +558,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   let workout = store.get(K.draft, null) || TEMPLATES.example.make();
   normalize(workout);
   function normalize(w) {
-    w.blocks.forEach((b) => { if (!(b.kind in KINDS)) b.kind = "interval"; b.moves ??= ""; b.up ??= b.kind === "fortime"; });
+    w.blocks.forEach((b) => { if (!(b.kind in KINDS)) b.kind = "interval"; b.moves ??= ""; b.up ??= b.kind === "fortime"; b.reps ??= 10; b.waitAfter ??= false; });
     return w;
   }
 
@@ -572,16 +584,26 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     const segs = [];
     if (withPrep && w.countdown > 0) segs.push({ phase: "prep", dur: w.countdown, bi: 0, round: 0 });
     w.blocks.forEach((b, bi) => {
+      const isLast = bi === w.blocks.length - 1;
       for (let r = 1; r <= b.rounds; r++) {
-        if (b.work > 0) segs.push({ phase: "work", dur: b.work, bi, round: r });
+        // Série de répétitions : pas de durée, on passe à la suite en touchant « Série terminée »
+        if (b.kind === "reps") segs.push({ phase: "work", dur: Infinity, open: true, bi, round: r });
+        else if (b.work > 0) segs.push({ phase: "work", dur: b.work, bi, round: r });
         if (b.rest > 0 && r < b.rounds) segs.push({ phase: "rest", dur: b.rest, bi, round: r });
       }
-      if (bi < w.blocks.length - 1 && b.restAfter > 0) segs.push({ phase: "blockrest", dur: b.restAfter, bi, round: b.rounds });
+      if (isLast) return;
+      if (b.restAfter > 0) segs.push({ phase: "blockrest", dur: b.restAfter, bi, round: b.rounds });
+      if (b.waitAfter) {
+        segs.push({ phase: "wait", dur: Infinity, open: true, bi, round: b.rounds });
+        if (withPrep && w.countdown > 0) segs.push({ phase: "prep", dur: w.countdown, bi: bi + 1, round: 0 });
+      }
     });
     return segs;
   }
-  const blockTotal = (b) => b.rounds * b.work + Math.max(0, b.rounds - 1) * b.rest;
-  const totalOf = (w) => buildSegments(w).reduce((a, s) => a + s.dur, 0);
+  const blockTotal = (b) => (b.kind === "reps" ? 0 : b.rounds * b.work) + Math.max(0, b.rounds - 1) * b.rest;
+  const finiteSum = (segs) => segs.reduce((a, s) => a + (Number.isFinite(s.dur) ? s.dur : 0), 0);
+  const totalOf = (w) => finiteSum(buildSegments(w));
+  const hasOpen = (w) => w.blocks.some((b, i) => b.kind === "reps" || (b.waitAfter && i < w.blocks.length - 1));
 
   // ---------- Accueil : modes et touches ----------
   $("modes").innerHTML = MODES.map((m, i) =>
@@ -606,16 +628,17 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   function loadTemplate(key) {
     workout = TEMPLATES[key].make(); renderEditor();
     $("build-title").scrollIntoView({ behavior: "smooth", block: "start" });
-    toast(`${TEMPLATES[key].label} chargé : ajustez puis Démarrer`);
+    toast(`${TEMPLATES[key].label} : réglez les chiffres puis Démarrer`);
   }
-  function quickStart(key) { workout = TEMPLATES[key].make(); renderEditor(); start(); }
 
   // ---------- Éditeur ----------
   function timeInputs(id, secs) {
     return `<span class="time"><input type="number" id="${id}-m" min="0" max="180" value="${Math.floor(secs / 60)}" aria-label="minutes">′
       <input type="number" id="${id}-s" min="0" max="59" value="${secs % 60}" aria-label="secondes">″</span>`;
   }
-  const sumText = (b) => `${b.rounds} × ${fmt(b.work)}${b.rest ? ` / repos ${fmt(b.rest)}` : ""} = ${fmt(blockTotal(b))}`;
+  const sumText = (b) => b.kind === "reps"
+    ? `${b.rounds} × ${b.reps} reps${b.rest ? ` · repos ${fmt(b.rest)} entre séries` : ""} · à votre rythme`
+    : `${b.rounds} × ${fmt(b.work)}${b.rest ? ` / repos ${fmt(b.rest)}` : ""} = ${fmt(blockTotal(b))}`;
 
   function renderEditor() {
     $("w-name").value = workout.name;
@@ -636,22 +659,25 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
           </div>
         </div>
         <div class="field-row">
-          <label class="field"><span class="label">Tours</span>
+          <label class="field"><span class="label">${b.kind === "reps" ? "Séries" : "Tours"}</span>
             <input type="number" id="b${i}-rounds" data-k="rounds" min="1" max="99" value="${b.rounds}"></label>
-          <div class="field"><span class="label">${b.kind === "fortime" ? "Time cap" : b.kind === "amrap" || b.kind === "countdown" ? "Durée" : "Travail"}</span>${timeInputs(`b${i}-work`, b.work)}</div>
-          <div class="field"><span class="label">Repos entre tours</span>${timeInputs(`b${i}-rest`, b.rest)}</div>
+          ${b.kind === "reps"
+            ? `<label class="field"><span class="label">Répétitions</span><input type="number" id="b${i}-reps" data-k="reps" min="1" max="999" value="${b.reps}"></label>`
+            : `<div class="field"><span class="label">${b.kind === "fortime" ? "Time cap" : b.kind === "amrap" || b.kind === "countdown" ? "Durée" : "Travail (ON)"}</span>${timeInputs(`b${i}-work`, b.work)}</div>`}
+          <div class="field"><span class="label">${b.kind === "reps" ? "Repos entre séries" : "Repos entre tours (OFF)"}</span>${timeInputs(`b${i}-rest`, b.rest)}</div>
           ${i < last ? `<div class="field"><span class="label">Repos après le bloc</span>${timeInputs(`b${i}-after`, b.restAfter)}</div>` : ""}
         </div>
         <label class="field full"><span class="label">Ateliers / mouvements (un par ligne, affichés tour par tour)</span>
           <textarea id="b${i}-moves" data-k="moves" rows="2" placeholder="Ex. Wall ball&#10;Burpees&#10;Rameur">${esc(b.moves)}</textarea></label>
-        <label class="check"><input type="checkbox" id="b${i}-up" data-k="up" ${b.up ? "checked" : ""}> Chrono montant (de 0 vers le temps)</label>
+        ${b.kind === "reps" ? "" : `<label class="check"><input type="checkbox" id="b${i}-up" data-k="up" ${b.up ? "checked" : ""}> Chrono montant (de 0 vers le temps)</label>`}
+        ${i < last ? `<label class="check"><input type="checkbox" id="b${i}-wait" data-k="waitAfter" ${b.waitAfter ? "checked" : ""}> Attendre mon signal avant le bloc suivant</label>` : ""}
         <div class="block-sum">${sumText(b)}</div>
       </article>`).join("");
     renderTotal();
   }
 
   function renderTotal() {
-    $("total").textContent = fmt(totalOf(workout));
+    $("total").textContent = fmt(totalOf(workout)) + (hasOpen(workout) ? " +" : "");
     workout.blocks.forEach((b, i) => {
       const el = document.querySelector(`.block[data-i="${i}"] .block-sum`);
       if (el) el.textContent = sumText(b);
@@ -667,9 +693,12 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     else if (k === "moves") b.moves = e.target.value;
     else if (k === "rounds") b.rounds = clampInt(e.target.value, 1, 99);
     else if (k === "up") b.up = e.target.checked;
+    else if (k === "waitAfter") b.waitAfter = e.target.checked;
+    else if (k === "reps") b.reps = clampInt(e.target.value, 1, 999);
     else if (k === "kind") return;
     else {
-      b.work = readTime(`b${i}-work`); b.rest = readTime(`b${i}-rest`);
+      if ($(`b${i}-work-m`)) b.work = readTime(`b${i}-work`);
+      b.rest = readTime(`b${i}-rest`);
       if ($(`b${i}-after-m`)) b.restAfter = readTime(`b${i}-after`);
     }
     renderTotal();
@@ -677,7 +706,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   $("blocks").addEventListener("change", (e) => {
     if (e.target.dataset.k !== "kind") return;
     const i = +e.target.closest(".block").dataset.i, old = workout.blocks[i];
-    workout.blocks[i] = block(e.target.value, { name: old.name, moves: old.moves, restAfter: old.restAfter });
+    workout.blocks[i] = block(e.target.value, { name: old.name, moves: old.moves, restAfter: old.restAfter, waitAfter: old.waitAfter });
     renderEditor();
   });
   $("blocks").addEventListener("click", (e) => {
@@ -690,9 +719,11 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   });
   $("w-name").addEventListener("input", (e) => { workout.name = e.target.value; renderTotal(); });
   $("w-countdown").addEventListener("input", (e) => { workout.countdown = clampInt(e.target.value, 0, 120); renderTotal(); });
-  $("add-block").addEventListener("click", () => {
-    const prev = workout.blocks[workout.blocks.length - 1];
-    workout.blocks.push(prev ? { ...prev, name: "" } : block("interval")); renderEditor();
+  $("add-kinds").innerHTML = Object.entries(KINDS).map(([k, v]) => `<button class="chip" type="button" data-add="${k}">+ ${v.label}</button>`).join("");
+  $("add-kinds").addEventListener("click", (e) => {
+    const k = e.target.dataset.add; if (!k) return;
+    workout.blocks.push(block(k)); renderEditor();
+    document.querySelector(`.block[data-i="${workout.blocks.length - 1}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
   });
   $("apply-all").addEventListener("click", () => {
     const a = workout.blocks[0];
@@ -700,6 +731,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     renderEditor(); toast("Réglages du bloc A copiés (noms et ateliers conservés)");
   });
   $("templates").innerHTML = Object.entries(TEMPLATES).map(([k, t]) => `<button class="chip" type="button" data-t="${k}">${t.label}</button>`).join("");
+  $("templates").insertAdjacentHTML("beforebegin", `<p class="hint">Les modèles remplacent la séance en cours. Tous les chiffres restent modifiables.</p>`);
   $("templates").addEventListener("click", (e) => { const t = e.target.dataset.t; if (t) { workout = TEMPLATES[t].make(); renderEditor(); } });
 
   // ---------- Séances enregistrées ----------
@@ -708,7 +740,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     $("saved-list").innerHTML = list.length
       ? list.map((w, i) => `<div class="saved-item">
           <span class="slotno">${w.slot ?? "–"}</span>
-          <button class="load" data-load="${i}" type="button">${esc(w.name || "Sans nom")} <small>· ${w.blocks.length} bloc(s) · ${fmt(totalOf(w))}</small></button>
+          <button class="load" data-load="${i}" type="button">${esc(w.name || "Sans nom")} <small>· ${w.blocks.length} bloc(s) · ${fmt(totalOf(w))}${hasOpen(w) ? " +" : ""}</small></button>
           <button class="icon-btn" data-delsaved="${i}" type="button">Supprimer</button></div>`).join("")
       : `<p class="empty">Aucune séance enregistrée.</p>`;
     renderKeypad();
@@ -1023,14 +1055,16 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   }
   function announce(seg) {
     const b = workout.blocks[seg.bi];
-    if (seg.phase === "work") say(moveFor(seg) || (seg.round === 1 ? blockName(b, seg.bi) : `Tour ${seg.round}`));
+    if (seg.phase === "work" && b.kind === "reps") say(`Série ${seg.round}${moveFor(seg) ? `, ${moveFor(seg)}` : ""}, ${b.reps} répétitions`);
+    else if (seg.phase === "work") say(moveFor(seg) || (seg.round === 1 ? blockName(b, seg.bi) : `Tour ${seg.round}`));
     else if (seg.phase === "rest") say("Repos");
+    else if (seg.phase === "wait") say(`${blockName(b, seg.bi)} terminé`);
     else if (seg.phase === "blockrest") { const n = workout.blocks[seg.bi + 1]; say(`Repos. Ensuite, ${n ? blockName(n, seg.bi + 1) : "fin"}`); }
   }
   function onSegmentStart() {
     const seg = S.segs[S.idx]; S.lastBeep = null;
     if (seg.phase === "work") { beep(1320, 0.5); vibrate(300); }
-    else if (seg.phase === "rest" || seg.phase === "blockrest") { beep(520, 0.5); vibrate([150, 80, 150]); }
+    else if (seg.phase === "rest" || seg.phase === "blockrest" || seg.phase === "wait") { beep(520, 0.5); vibrate([150, 80, 150]); }
     if (seg.phase !== "prep") setTimeout(() => announce(seg), 550);
     setTimeout(() => duck(false), 1200);
   }
@@ -1082,6 +1116,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
       $("r-bar").style.width = "100%";
       $("r-counter").hidden = true;
       $("b-pause").textContent = "Recommencer";
+      $("b-next").textContent = "▶▶"; $("b-next").classList.remove("done");
       return;
     }
     const seg = S.segs[S.idx];
@@ -1091,39 +1126,45 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     run.dataset.phase = seg.phase;
 
     $("r-block").innerHTML = `${esc(blockName(b, seg.bi))}<small>${kindLabel} · bloc ${seg.bi + 1}/${workout.blocks.length}</small>`;
-    $("r-phase").textContent = { prep: "Préparez-vous", work: b.kind === "interval" ? "Travail" : kindLabel, rest: "Repos", blockrest: "Repos entre blocs" }[seg.phase];
+    $("r-phase").textContent = { prep: "Préparez-vous", work: b.kind === "interval" ? "Travail" : b.kind === "reps" ? "Série en cours" : kindLabel,
+      rest: "Repos", blockrest: "Repos entre blocs", wait: "En attente" }[seg.phase];
 
+    const elapsed = ((S.pausedAt ?? now()) - S.segStart) / 1000;
     const up = seg.phase === "work" && b.up;
-    $("r-clock").textContent = up ? fmt(Math.floor(seg.dur - remaining)) : fmt(Math.ceil(remaining));
+    $("r-clock").textContent = seg.open ? fmt(Math.floor(elapsed)) : up ? fmt(Math.floor(seg.dur - remaining)) : fmt(Math.ceil(remaining));
 
     // Mouvement en cours (ou à venir pendant la préparation / le repos)
     let mv = "";
-    if (seg.phase === "work") mv = moveFor(seg);
+    if (seg.phase === "work") mv = [moveFor(seg), b.kind === "reps" ? `${b.reps} reps` : ""].filter(Boolean).join(" · ");
+    else if (seg.phase === "wait") { const n = workout.blocks[seg.bi + 1]; mv = n ? `→ ${blockName(n, seg.bi + 1)}` : ""; }
     else { const nx = S.segs.slice(S.idx + 1).find((s) => s.phase === "work"); if (nx && moveFor(nx)) mv = `→ ${moveFor(nx)}`; }
     $("r-move").textContent = mv; $("r-move").hidden = !mv;
 
     $("r-round").innerHTML = seg.phase === "prep" ? "" :
+      seg.phase === "wait" ? "Touchez « Bloc suivant » quand vous êtes prêts" :
       seg.phase === "blockrest" ? `${esc(blockName(b, seg.bi))} terminé` :
+      b.kind === "reps" ? `Série ${seg.round} <span>/ ${b.rounds}</span>` :
       b.rounds > 1 ? `${movesOf(b).length ? "Station" : "Tour"} ${seg.round} <span>/ ${b.rounds}</span>` : "";
 
     const showCounter = seg.phase === "work" && (b.kind === "amrap" || b.kind === "fortime");
     $("r-counter").hidden = !showCounter;
     if (showCounter) $("c-val").textContent = S.counts[`${seg.bi}-${seg.round}`] || 0;
     $("c-plus").textContent = b.kind === "amrap" ? "+1 tour" : "+1";
-    const finishable = seg.phase === "work" && b.kind === "fortime";
-    $("b-next").textContent = finishable ? "Fini !" : "▶▶";
+    const finishable = (seg.phase === "work" && (b.kind === "fortime" || seg.open)) || seg.phase === "wait";
+    $("b-next").textContent = seg.phase === "wait" ? "Bloc suivant ▶" : seg.open ? "Série terminée ✓" : finishable ? "Fini !" : "▶▶";
     $("b-next").classList.toggle("done", finishable);
 
-    $("r-bar").style.width = `${Math.min(100, Math.max(0, (1 - remaining / seg.dur) * 100))}%`;
-    const left = remaining + S.segs.slice(S.idx + 1).reduce((a, s) => a + s.dur, 0);
-    $("r-total").textContent = fmt(Math.ceil(left));
+    $("r-bar").style.width = seg.open ? "0%" : `${Math.min(100, Math.max(0, (1 - remaining / seg.dur) * 100))}%`;
+    const rest = S.segs.slice(S.idx + 1);
+    const left = (seg.open ? 0 : remaining) + finiteSum(rest);
+    $("r-total").textContent = fmt(Math.ceil(left)) + (seg.open || rest.some((x) => x.open) ? " +" : "");
 
     const nx = S.segs[S.idx + 1];
     if (!nx) $("r-next").textContent = "Dernière étape";
     else {
       const nb = workout.blocks[nx.bi];
-      const what = nx.phase === "work" ? `${esc(moveFor(nx) || blockName(nb, nx.bi))}${nb.rounds > 1 ? ` · ${nx.round}/${nb.rounds}` : ""}` : nx.phase === "rest" ? "Repos" : "Repos entre blocs";
-      $("r-next").innerHTML = `Ensuite : <b>${what}</b> · ${fmt(nx.dur)}`;
+      const what = nx.phase === "wait" ? "Pause, à votre signal" : nx.phase === "prep" ? "Préparation" : nx.phase === "work" ? `${esc(moveFor(nx) || blockName(nb, nx.bi))}${nb.rounds > 1 ? ` · ${nx.round}/${nb.rounds}` : ""}` : nx.phase === "rest" ? "Repos" : "Repos entre blocs";
+      $("r-next").innerHTML = `Ensuite : <b>${what}</b>${Number.isFinite(nx.dur) ? ` · ${fmt(nx.dur)}` : ""}`;
     }
     $("b-pause").textContent = S.pausedAt != null ? "Reprendre" : "Pause";
   }
@@ -1207,8 +1248,8 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
       return;
     }
     if (/^[0-9]$/.test(k)) { if (scr) exitScreen(); launchSlot(k); return; }
-    if (k === "t" || k === "T") { if (scr) exitScreen(); quickStart("tabata"); }
-    else if (k === "f" || k === "F") { if (scr) exitScreen(); quickStart("fgb"); }
+    if (k === "t" || k === "T") { if (scr) exitScreen(); loadTemplate("tabata"); }
+    else if (k === "f" || k === "F") { if (scr) exitScreen(); loadTemplate("fgb"); }
     else if (k === "s" || k === "S") { if (scr) exitScreen(); openStopwatch(); }
     else if (k === "c" || k === "C") { if (scr) exitScreen(); openClock(); }
     else if (!scr && k === "Enter" && e.target === document.body) start();
