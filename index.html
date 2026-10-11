@@ -183,6 +183,7 @@ details.help summary { cursor: pointer; font: 700 .95rem/1 var(--font-display); 
 .startbar .inner { width: 100%; max-width: 760px; display: flex; align-items: center; gap: 14px; }
 .total { flex: 1; min-width: 0; }
 .total b { display: block; font: 800 1.6rem/1 var(--font-digits); }
+.go:disabled { background: var(--line); color: var(--muted); }
 .go {
   background: var(--work); color: var(--on-accent); border: none; border-radius: 12px; padding: 16px 28px;
   font: 800 1.35rem/1 var(--font-display); text-transform: uppercase; letter-spacing: .08em;
@@ -313,6 +314,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     <span class="label" style="flex-basis:100%">Ajouter un timer à la suite</span>
     <div class="templates" id="add-kinds"></div>
     <button class="btn" id="apply-all" type="button">Copier le bloc A sur tous</button>
+    <button class="btn" id="clear" type="button">Tout effacer</button>
   </div>
 
   <section class="section" aria-labelledby="save-title">
@@ -491,7 +493,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   const $ = (id) => document.getElementById(id);
   const $$ = (sel) => [...document.querySelectorAll(sel)];
   const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const K = { saved: "coaching-timer:saved", draft: "coaching-timer:draft", prefs: "coaching-timer:prefs", sp: "coaching-timer:spotify" };
+  const K = { saved: "coaching-timer:saved", draft: "coaching-timer:draft-v2", prefs: "coaching-timer:prefs", sp: "coaching-timer:spotify" };
 
   // ---------- Stockage (tolérant aux erreurs) ----------
   const store = {
@@ -506,7 +508,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
 
   // ---------- Types de bloc ----------
   const KINDS = {
-    interval: { label: "Intervalles", defaults: { rounds: 7, work: 300, rest: 0, up: false } },
+    interval: { label: "Intervalles", defaults: { rounds: 5, work: 60, rest: 30, up: false } },
     amrap:    { label: "AMRAP",       defaults: { rounds: 1, work: 720, rest: 0, up: false } },
     emom:     { label: "EMOM",        defaults: { rounds: 10, work: 60, rest: 0, up: false } },
     tabata:   { label: "Tabata",      defaults: { rounds: 8, work: 20, rest: 10, up: false } },
@@ -529,6 +531,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
         block("reps", { rounds: 3, reps: 10, rest: 90 }),
       ] }) },
     reps: { label: "3 séries × 10 reps", make: () => ({ name: "3 × 10", countdown: 10, blocks: [block("reps")] }) },
+    interval: { label: "Intervalles", make: () => ({ name: "Intervalles", countdown: 10, blocks: [block("interval")] }) },
     tabata: { label: "Tabata", make: () => ({ name: "Tabata", countdown: 10, blocks: [block("tabata", { restAfter: 0 })] }) },
     fgb: { label: "Fight Gone Bad", make: () => ({
       name: "Fight Gone Bad", countdown: 10,
@@ -545,7 +548,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   // Touches de mode (inspirées de la télécommande Echo)
   const MODES = [
     { key: "▼", label: "Minuteur", desc: "Ex. 5′ d'échauffement", run: () => loadTemplate("countdown") },
-    { key: "INT", label: "Intervalles", desc: "Travail / repos au choix", run: () => loadTemplate("example") },
+    { key: "INT", label: "Intervalles", desc: "Travail / repos au choix", run: () => loadTemplate("interval") },
     { key: "TBT", label: "Tabata", desc: "Tours, ON, OFF au choix", run: () => loadTemplate("tabata") },
     { key: "×", label: "Séries / reps", desc: "Ex. 3 × 10, repos", run: () => loadTemplate("reps") },
     { key: "FGB", label: "Fight Gone Bad", desc: "Rounds et minutes au choix", run: () => loadTemplate("fgb") },
@@ -554,7 +557,8 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     { key: "CLOCK", label: "Horloge", desc: "Heure 12 / 24 h", run: () => openClock() },
   ];
 
-  let workout = store.get(K.draft, null) || TEMPLATES.example.make();
+  const emptyWorkout = () => ({ name: "", countdown: 10, blocks: [] });
+  let workout = store.get(K.draft, null) || emptyWorkout();
   normalize(workout);
   function normalize(w) {
     w.blocks.forEach((b) => { if (!(b.kind in KINDS)) b.kind = "interval"; delete b.moves; b.up ??= b.kind === "fortime"; b.reps ??= 10; b.waitAfter ??= false; });
@@ -580,6 +584,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   // ---------- Séquence ----------
   function buildSegments(w, withPrep = prefs.prep) {
     const segs = [];
+    if (!w.blocks.length) return segs;
     if (withPrep && w.countdown > 0) segs.push({ phase: "prep", dur: w.countdown, bi: 0, round: 0 });
     w.blocks.forEach((b, bi) => {
       const isLast = bi === w.blocks.length - 1;
@@ -642,6 +647,13 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     $("w-name").value = workout.name;
     $("w-countdown").value = workout.countdown;
     const last = workout.blocks.length - 1;
+    $("apply-all").hidden = workout.blocks.length < 2;
+    $("clear").hidden = !workout.blocks.length;
+    $("go").disabled = !workout.blocks.length;
+    if (!workout.blocks.length) {
+      $("blocks").innerHTML = `<p class="empty">Aucun timer pour l'instant. Touchez un mode en haut, ou ajoutez un timer juste en dessous.</p>`;
+      renderTotal(); return;
+    }
     $("blocks").innerHTML = workout.blocks.map((b, i) => `
       <article class="block" data-i="${i}">
         <div class="block-head">
@@ -653,7 +665,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
           <div class="block-tools">
             <button class="icon-btn" data-act="up" type="button" aria-label="Monter" ${i === 0 ? "disabled" : ""}>↑</button>
             <button class="icon-btn" data-act="dup" type="button">Dupliquer</button>
-            <button class="icon-btn" data-act="del" type="button" ${workout.blocks.length === 1 ? "disabled" : ""}>Suppr.</button>
+            <button class="icon-btn" data-act="del" type="button">Suppr.</button>
           </div>
         </div>
         <div class="field-row">
@@ -707,7 +719,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   $("blocks").addEventListener("click", (e) => {
     const act = e.target.dataset.act; if (!act) return;
     const i = +e.target.closest(".block").dataset.i;
-    if (act === "del" && workout.blocks.length > 1) workout.blocks.splice(i, 1);
+    if (act === "del") workout.blocks.splice(i, 1);
     if (act === "dup") workout.blocks.splice(i + 1, 0, { ...workout.blocks[i], name: "" });
     if (act === "up" && i > 0) [workout.blocks[i - 1], workout.blocks[i]] = [workout.blocks[i], workout.blocks[i - 1]];
     renderEditor();
@@ -719,6 +731,16 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     const k = e.target.dataset.add; if (!k) return;
     workout.blocks.push(block(k)); renderEditor();
     document.querySelector(`.block[data-i="${workout.blocks.length - 1}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+  $("clear").addEventListener("click", (e) => {
+    const btn = e.currentTarget;
+    if (!btn.dataset.armed) {
+      btn.dataset.armed = "1"; btn.textContent = "Confirmer ?";
+      setTimeout(() => { delete btn.dataset.armed; btn.textContent = "Tout effacer"; }, 3000);
+      return;
+    }
+    delete btn.dataset.armed; btn.textContent = "Tout effacer";
+    workout = emptyWorkout(); $("save-slot").value = ""; renderEditor();
   });
   $("apply-all").addEventListener("click", () => {
     const a = workout.blocks[0];
