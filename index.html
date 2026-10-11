@@ -666,7 +666,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   const blockTotal = (b) => (b.kind === "reps" ? 0 : b.rounds * b.work) + Math.max(0, b.rounds - 1) * b.rest;
   const finiteSum = (segs) => segs.reduce((a, s) => a + (Number.isFinite(s.dur) ? s.dur : 0), 0);
   const totalOf = (w) => finiteSum(buildSegments(w));
-  const hasOpen = (w) => w.manual || w.blocks.some((b, i) => b.kind === "reps" || (b.waitAfter && i < w.blocks.length - 1));
+  const hasOpen = (w) => w.blocks.length > 0 && w.manual || w.blocks.some((b, i) => b.kind === "reps" || (b.waitAfter && i < w.blocks.length - 1));
   const workoutLength = (w) => w.total ? fmt(w.total) : fmt(totalOf(w)) + (hasOpen(w) ? " +" : "");
 
   // ---------- Onglets ----------
@@ -716,10 +716,19 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     }
     const s = e.target.closest(".slot.filled"); if (s) launchSlot(s.dataset.slot);
   });
+  // Séance lancée depuis une touche : elle ne remplace pas ce qui est dans l'onglet Séance.
+  // On garde le brouillon de côté et on le remet en sortant (vide si rien n'était en cours).
+  let draftBeforeSlot = null;
   function launchSlot(n) {
     const w = store.get(K.saved, []).find((x) => String(x.slot) === String(n));
     if (!w) { toast(`Aucune séance sur la touche ${n}`); return; }
-    workout = normalize(JSON.parse(JSON.stringify(w))); $("save-slot").value = w.slot ?? ""; renderEditor(); start();
+    if (!draftBeforeSlot) draftBeforeSlot = { workout, slot: $("save-slot").value, openIdx };
+    workout = normalize(JSON.parse(JSON.stringify(w))); start();
+  }
+  function restoreDraft() {
+    if (!draftBeforeSlot) return;
+    ({ workout, openIdx } = draftBeforeSlot); $("save-slot").value = draftBeforeSlot.slot;
+    draftBeforeSlot = null; renderEditor();
   }
 
   // ---------- Éditeur ----------
@@ -891,8 +900,12 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     const copy = JSON.parse(JSON.stringify({ ...workout, name, slot }));
     const idx = list.findIndex((w) => w.name === name);
     if (idx >= 0) list[idx] = copy; else list.unshift(copy);
-    toast(store.set(K.saved, list) ? `« ${name} » enregistrée${slot != null ? ` sur la touche ${slot}` : ""}` : "Impossible d'enregistrer dans ce navigateur");
+    const ok = store.set(K.saved, list);
     renderSaved();
+    if (!ok) { toast("Impossible d'enregistrer dans ce navigateur"); return; }
+    // Une fois enregistrée, l'onglet Séance repart à zéro pour préparer la suivante
+    workout = emptyWorkout(); openIdx = -1; $("save-slot").value = ""; renderEditor(); window.scrollTo({ top: 0 });
+    toast(`« ${name} » enregistrée${slot != null ? ` sur la touche ${slot}` : ""}. Nouvelle séance vide.`);
   });
   $("saved-list").addEventListener("click", (e) => {
     const list = store.get(K.saved, []);
@@ -1169,6 +1182,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     }
     clearInterval(SW.timer); clearInterval(CK.timer);
     show(null);
+    restoreDraft();
   }
   $$("[data-exit]").forEach((b) => b.addEventListener("click", (e) => {
     const btn = e.currentTarget;
