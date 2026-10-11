@@ -365,7 +365,8 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
         </label>
       </div>
       <p class="hint">Durée de la séance : facultatif. Elle tourne en continu en même temps que vos timers et sonne à 0. Laissez 0′ 0″ si vous n'en avez pas besoin.</p>
-      <label class="check"><input type="checkbox" id="w-waitfirst"> Attendre mon signal avant le premier timer</label>
+      <label class="check"><input type="checkbox" id="w-manual"> Je lance chaque timer moi-même</label>
+      <p class="hint" id="w-manual-hint"></p>
     </div>
 
     <div class="card">
@@ -611,11 +612,12 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   };
   const KIND_ORDER = ["countdown", "interval", "tabata", "reps", "amrap", "emom", "fortime"];
 
-  const emptyWorkout = () => ({ name: "", countdown: 10, total: 0, waitFirst: false, blocks: [] });
+  const emptyWorkout = () => ({ name: "", countdown: 10, total: 0, manual: true, blocks: [] });
   let workout = store.get(K.draft, null) || emptyWorkout();
   normalize(workout);
   function normalize(w) {
-    w.total ??= 0; w.waitFirst ??= false;
+    // Par défaut, chaque timer se lance à la main (ancien réglage « attendre au départ » remplacé)
+    w.total ??= 0; w.manual ??= true; delete w.waitFirst;
     w.blocks.forEach((b) => { if (!(b.kind in KINDS)) b.kind = "interval"; delete b.moves; b.up ??= b.kind === "fortime"; b.reps ??= 10; b.waitAfter ??= false; });
     return w;
   }
@@ -640,7 +642,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   function buildSegments(w, withPrep = prefs.prep) {
     const segs = [];
     if (!w.blocks.length) return segs;
-    if (w.waitFirst) segs.push({ phase: "wait", dur: Infinity, open: true, first: true, bi: 0, round: 0 });
+    if (w.manual) segs.push({ phase: "wait", dur: Infinity, open: true, first: true, bi: 0, round: 0 });
     if (withPrep && w.countdown > 0) segs.push({ phase: "prep", dur: w.countdown, bi: 0, round: 0 });
     w.blocks.forEach((b, bi) => {
       const isLast = bi === w.blocks.length - 1;
@@ -652,7 +654,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
       }
       if (isLast) return;
       if (b.restAfter > 0) segs.push({ phase: "blockrest", dur: b.restAfter, bi, round: b.rounds });
-      if (b.waitAfter) {
+      if (w.manual || b.waitAfter) {
         segs.push({ phase: "wait", dur: Infinity, open: true, bi, round: b.rounds });
         if (withPrep && w.countdown > 0) segs.push({ phase: "prep", dur: w.countdown, bi: bi + 1, round: 0 });
       }
@@ -664,7 +666,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   const blockTotal = (b) => (b.kind === "reps" ? 0 : b.rounds * b.work) + Math.max(0, b.rounds - 1) * b.rest;
   const finiteSum = (segs) => segs.reduce((a, s) => a + (Number.isFinite(s.dur) ? s.dur : 0), 0);
   const totalOf = (w) => finiteSum(buildSegments(w));
-  const hasOpen = (w) => w.blocks.some((b, i) => b.kind === "reps" || (b.waitAfter && i < w.blocks.length - 1));
+  const hasOpen = (w) => w.manual || w.blocks.some((b, i) => b.kind === "reps" || (b.waitAfter && i < w.blocks.length - 1));
   const workoutLength = (w) => w.total ? fmt(w.total) : fmt(totalOf(w)) + (hasOpen(w) ? " +" : "");
 
   // ---------- Onglets ----------
@@ -731,7 +733,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     if (b.rounds === 1 && !b.rest) return `${fmt(b.work)}${b.up ? " · montant" : ""}`;
     return `${b.rounds} × ${fmt(b.work)}${b.rest ? ` / ${fmt(b.rest)}` : ""} = ${fmt(blockTotal(b))}`;
   }
-  const betweenText = (b) => [b.restAfter ? `Repos ${fmt(b.restAfter)}` : "", b.waitAfter ? "J'attends votre signal" : ""].filter(Boolean).join(" · ");
+  const betweenText = (b) => [b.restAfter ? `Repos ${fmt(b.restAfter)}` : "", workout.manual ? "Vous lancez le suivant" : b.waitAfter ? "J'attends votre signal" : "Enchaîne automatiquement"].filter(Boolean).join(" · ");
 
   function editFields(b, i, last) {
     const workLabel = b.kind === "fortime" ? "Time cap" : b.kind === "amrap" || b.kind === "countdown" ? "Durée" : "Travail (ON)";
@@ -754,7 +756,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
       ${i < last ? `<div class="field-row">
           <div class="field"><span class="label">Repos avant le timer suivant</span>${timeInputs(`b${i}-after`, b.restAfter)}</div>
         </div>
-        <label class="check"><input type="checkbox" id="b${i}-wait" data-k="waitAfter" ${b.waitAfter ? "checked" : ""}> Attendre mon signal avant le timer suivant</label>` : ""}
+        ${workout.manual ? "" : `<label class="check"><input type="checkbox" id="b${i}-wait" data-k="waitAfter" ${b.waitAfter ? "checked" : ""}> Attendre mon signal avant le timer suivant</label>`}` : ""}
       <div class="timer-tools">
         <button class="icon-btn" data-act="up" type="button" ${i === 0 ? "disabled" : ""}>↑ Monter</button>
         <button class="icon-btn" data-act="down" type="button" ${i === last ? "disabled" : ""}>↓ Descendre</button>
@@ -769,7 +771,10 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     $("w-countdown").value = workout.countdown;
     $("w-total-m").value = Math.floor(workout.total / 60);
     $("w-total-s").value = workout.total % 60;
-    $("w-waitfirst").checked = workout.waitFirst;
+    $("w-manual").checked = workout.manual;
+    $("w-manual-hint").textContent = workout.manual
+      ? "Chaque timer attend que vous touchiez « Lancer ». La durée de la séance, elle, tourne en continu."
+      : "Les timers s'enchaînent tout seuls, sauf si vous cochez « Attendre mon signal » dans un timer.";
     const n = workout.blocks.length, last = n - 1;
     if (openIdx >= n) openIdx = -1;
     $("zero").hidden = !n && !workout.total && !workout.name;
@@ -842,7 +847,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
   const readTotal = () => { workout.total = readTime("w-total"); renderTotal(); };
   $("w-total-m").addEventListener("input", readTotal);
   $("w-total-s").addEventListener("input", readTotal);
-  $("w-waitfirst").addEventListener("change", (e) => { workout.waitFirst = e.target.checked; renderTotal(); });
+  $("w-manual").addEventListener("change", (e) => { workout.manual = e.target.checked; renderEditor(); });
 
   // Ajouter un timer : on choisit le type, il s'ajoute à la fin et s'ouvre
   $("kind-picker").innerHTML = KIND_ORDER.map((k) =>
@@ -1321,7 +1326,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     $("r-move").textContent = mv; $("r-move").hidden = !mv;
 
     $("r-round").innerHTML = seg.phase === "prep" ? "" :
-      seg.phase === "wait" ? `Touchez « ${seg.first ? "Lancer" : "Bloc suivant"} » quand vous êtes prêts` :
+      seg.phase === "wait" ? "Touchez « Lancer » quand vous êtes prête" :
       seg.phase === "tail" ? "Timers terminés · la séance se termine à 0:00" :
       seg.phase === "blockrest" ? `${esc(blockName(b, seg.bi))} terminé` :
       b.kind === "reps" ? `Série ${seg.round} <span>/ ${b.rounds}</span>` :
@@ -1332,7 +1337,7 @@ body.led .phase-pill { background: transparent; color: var(--led); border: 2px s
     if (showCounter) $("c-val").textContent = S.counts[`${seg.bi}-${seg.round}`] || 0;
     $("c-plus").textContent = b.kind === "amrap" ? "+1 tour" : "+1";
     const finishable = (seg.phase === "work" && (b.kind === "fortime" || seg.open)) || seg.phase === "wait" || seg.phase === "tail";
-    $("b-next").textContent = seg.phase === "tail" ? "Terminer ✓" : seg.first ? "Lancer ▶" : seg.phase === "wait" ? "Bloc suivant ▶" : seg.open ? "Série terminée ✓" : finishable ? "Fini !" : "▶▶";
+    $("b-next").textContent = seg.phase === "tail" ? "Terminer ✓" : seg.phase === "wait" ? "Lancer ▶" : seg.open ? "Série terminée ✓" : finishable ? "Fini !" : "▶▶";
     $("b-next").classList.toggle("done", finishable);
 
     $("r-bar").style.width = seg.open ? "0%" : `${Math.min(100, Math.max(0, (1 - remaining / seg.dur) * 100))}%`;
